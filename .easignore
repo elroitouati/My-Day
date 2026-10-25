@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+android/
+ios/
+
+# מפתחות Supabase — נשארים רק אצלך (ונשלחים ל-EAS דרך .easignore)
+
+# Native
+*.jks
+*.p8
+*.p12
+*.key
+*.keystore
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# OS / editor
+.DS_Store
+*.log
+npm-debug.*
+.idea/
+.vscode/
+coverage/

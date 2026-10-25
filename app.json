@@ -1,0 +1,83 @@
+{
+  "expo": {
+    "name": "My Day",
+    "slug": "my-day",
+    "owner": "elroi_touati",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "myday",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F5F6FA",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F5F6FA"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "android": {
+      "package": "com.elroi.myday",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6C5CFF"
+      },
+      "permissions": [
+        "android.permission.READ_CALENDAR",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE"
+      ],
+      "blockedPermissions": ["android.permission.WRITE_CALENDAR"]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6C5CFF"
+        }
+      ],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "My Day מציגה את האירועים מהיומן שלך כמשימות שאפשר לסמן."
+        }
+      ],
+      "expo-background-fetch",
+      "expo-font",
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./assets/fonts/Heebo-Regular.ttf",
+            "./assets/fonts/Heebo-Medium.ttf",
+            "./assets/fonts/Heebo-Bold.ttf",
+            "./assets/fonts/Heebo-ExtraBold.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "MyDay",
+              "label": "My Day",
+              "description": "המשימות של היום, עם סימון V ישירות ממסך הבית",
+              "minWidth": "250dp",
+              "minHeight": "180dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 3,
+              "maxResizeWidth": "600dp",
+              "maxResizeHeight": "900dp",
+              "previewImage": "./assets/widget-preview.png",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ],
+      "./plugins/withForceRTL"
+    ],
+    "extra": {
+      "supportsRTL": true
+    }
+  }
+}

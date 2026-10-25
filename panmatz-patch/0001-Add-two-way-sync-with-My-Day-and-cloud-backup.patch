@@ -1,0 +1,2196 @@
+From bffda2343973148459b240238b23649d4e97b3e0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sun, 25 Oct 2026 05:57:47 +0000
+Subject: [PATCH] Add two-way sync with My Day and cloud backup
+
+- Write today's training goals and completion to a shared Supabase table
+  (panmatz_daily) and apply completions coming back from My Day via Realtime.
+- Offline queue with last-write-wins on updated_at, no duplicates.
+- Settings: one-time sign in, sync now, full cloud backup and restore.
+- Purely additive: without Supabase keys or sign-in nothing runs and the app
+  behaves exactly as before. Local state key is unchanged.
+- Tests for the sync logic (npm test).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01VhC1jupvmKnQxdFH5KaLW4
+---
+ .easignore                    |  29 +
+ .env.example                  |   5 +
+ .gitignore                    |   4 +
+ README.md                     |  15 +-
+ package-lock.json             | 998 +++++++++++++++++++++++++++++++---
+ package.json                  |   7 +-
+ scripts/test-sync.mjs         |  87 +++
+ src/components/SyncSection.js | 168 ++++++
+ src/context/AppContext.js     |  19 +
+ src/screens/SettingsScreen.js |   5 +-
+ src/sync/panmatzSync.js       | 286 ++++++++++
+ src/sync/supabase.js          |  36 ++
+ src/utils/syncRows.js         |  89 +++
+ 13 files changed, 1681 insertions(+), 67 deletions(-)
+ create mode 100644 .easignore
+ create mode 100644 .env.example
+ create mode 100644 scripts/test-sync.mjs
+ create mode 100644 src/components/SyncSection.js
+ create mode 100644 src/sync/panmatzSync.js
+ create mode 100644 src/sync/supabase.js
+ create mode 100644 src/utils/syncRows.js
+
+diff --git a/.easignore b/.easignore
+new file mode 100644
+index 0000000..cb53fb4
+--- /dev/null
++++ b/.easignore
+@@ -0,0 +1,29 @@
++# dependencies
++node_modules/
++
++# Expo
++.expo/
++dist/
++web-build/
++*.orig.*
++
++# Native
++*.jks
++*.p8
++*.p12
++*.key
++*.mobileprovision
++
++# Metro
++.metro-health-check*
++
++# OS / editor
++.DS_Store
++*.log
++npm-debug.*
++yarn-debug.*
++yarn-error.*
++.idea/
++.vscode/
++
++# מפתחות Supabase — נשארים רק אצלך (ונשלחים ל-EAS דרך .easignore)
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..8cc2f71
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,5 @@
++# העתק את הקובץ הזה ל-.env ומלא את שני הערכים מ-Supabase
++# (אותם ערכים בדיוק כמו ב-My Day):
++# Project Settings → API → Project URL / anon public key
++EXPO_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT-ID.supabase.co
++EXPO_PUBLIC_SUPABASE_ANON_KEY=YOUR-ANON-KEY
+diff --git a/.gitignore b/.gitignore
+index 5c29669..92219a5 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -25,3 +25,7 @@ yarn-debug.*
+ yarn-error.*
+ .idea/
+ .vscode/
++
++# מפתחות Supabase — נשארים רק אצלך (ונשלחים ל-EAS דרך .easignore)
++.env
++.env.local
+diff --git a/README.md b/README.md
+index f032bbf..27b7818 100644
+--- a/README.md
++++ b/README.md
+@@ -37,7 +37,20 @@ eas build --platform android   # או ios
+ דגש חזק על **מתח** (החולשה — התקדמות עדינה של חזרה בכל פעם) ועדינות ב**ריצה** (כבר חוזק).
+ כל יעד מתקדם בנפרד עם כפתור "קל לי", ובהגעה ליעד הסופי עובר אוטומטית ל**מצב תחזוקה**.
+ 
++## סנכרון עם My Day (אופציונלי)
++
++תוספת בלבד: בלי מפתחות ובלי התחברות האפליקציה עובדת בדיוק כמו קודם.
++
++- יעדי האימון של כל יום והסימון שלהם נכתבים לטבלה `panmatz_daily` ב-Supabase,
++  ומופיעים ב-My Day כמשימות בקטגוריה "פנמ"צ". סימון בכל צד מתעדכן בשני (Realtime).
++- אופליין: השינויים נשמרים בתור מקומי (`elroi-panmatz-sync-v1`) ונשלחים כשחוזר החיבור.
++  "האחרון קובע" לפי `updated_at`, ונאכף גם בשרת.
++- "גיבוי מלא לענן / שחזור" בהגדרות — שומר את כל ה-state בטבלה `panmatz_backup`.
++- הגדרה: מעתיקים את `.env.example` ל-`.env` וממלאים את מפתחות Supabase
++  (הוראות מלאות ב-`SETUP.md` של My Day). הקוד ב-`src/sync/` ו-`src/utils/syncRows.js`.
++- בדיקות: `npm test`.
++
+ ## הערות
+ 
+-- כל הנתונים מקומיים למכשיר. אין הרשמה/פרופיל/ריבוי משתמשים.
++- כל הנתונים מקומיים למכשיר. התחברות נדרשת רק לסנכרון עם My Day ולגיבוי לענן.
+ - תאריכי השלבים מוזנים ידנית במסך ההגדרות כשהם נודעים; עד אז מסך הבית מציג חודש משוער בלבד.
+diff --git a/package-lock.json b/package-lock.json
+index f0e35b5..40294ad 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -15,6 +15,7 @@
+         "@react-navigation/material-top-tabs": "^6.6.14",
+         "@react-navigation/native": "^6.1.18",
+         "@react-navigation/native-stack": "^6.11.0",
++        "@supabase/supabase-js": "2.45.4",
+         "expo": "~51.0.28",
+         "expo-blur": "~13.0.3",
+         "expo-device": "~6.0.2",
+@@ -32,7 +33,8 @@
+         "react-native-safe-area-context": "4.10.5",
+         "react-native-screens": "3.31.1",
+         "react-native-svg": "15.2.0",
+-        "react-native-tab-view": "^3.5.2"
++        "react-native-tab-view": "^3.5.2",
++        "react-native-url-polyfill": "2.0.0"
+       },
+       "devDependencies": {
+         "@babel/core": "^7.24.0",
+@@ -93,13 +95,13 @@
+       }
+     },
+     "node_modules/@babel/generator": {
+-      "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/generator/-/generator-7.29.7.tgz",
+-      "integrity": "sha512-DkXD5OJQaAQIdZ1bt3UZdEnHAn9Imd3IVBdX03UFe+ony9Ojw5pzr9YVKGDY1jt+Gcn/FnGkNf8r+Vj5NOJWtQ==",
++      "version": "7.29.8",
++      "resolved": "https://registry.npmjs.org/@babel/generator/-/generator-7.29.8.tgz",
++      "integrity": "sha512-gZbepsdh3WDtgZKWL+vTPh71LSBrm/Y4/QDZBVCcYfmeTEEuoOYwlSy+G1StfJg+/Zy550u/3TATbm7qDbbMtg==",
+       "license": "MIT",
+       "dependencies": {
+-        "@babel/parser": "^7.29.7",
+-        "@babel/types": "^7.29.7",
++        "@babel/parser": "^7.29.8",
++        "@babel/types": "^7.29.8",
+         "@jridgewell/gen-mapping": "^0.3.12",
+         "@jridgewell/trace-mapping": "^0.3.28",
+         "jsesc": "^3.0.2"
+@@ -323,9 +325,9 @@
+       }
+     },
+     "node_modules/@babel/helper-string-parser": {
+-      "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-7.29.7.tgz",
+-      "integrity": "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw==",
++      "version": "7.29.11",
++      "resolved": "https://registry.npmjs.org/@babel/helper-string-parser/-/helper-string-parser-7.29.11.tgz",
++      "integrity": "sha512-snZbO7MEDOof+hvNa97EjEY7qD7h2kwvQr5AJC3ZhQudKW5dnej6k3kP9NQV88hJwaS8vDqRLFo9rivLEhle2g==",
+       "license": "MIT",
+       "engines": {
+         "node": ">=6.9.0"
+@@ -463,12 +465,12 @@
+       }
+     },
+     "node_modules/@babel/parser": {
+-      "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/parser/-/parser-7.29.7.tgz",
+-      "integrity": "sha512-hnORnjP/1P/zFEndoeX+n+t1RwWRJiJpM/jO7FW32Kn9r5+sJB2JWOdYo4L6k78j15eCwY3Gm/7364B1EMwtNg==",
++      "version": "7.29.11",
++      "resolved": "https://registry.npmjs.org/@babel/parser/-/parser-7.29.11.tgz",
++      "integrity": "sha512-OZ6+oaK7GMyg3IfCpj8JOmn8n+w2rJbDT0LLfVDTLb1ZFeKDh3AiNELgCMUw175IJHSkLl74hG0M0VLsvx+gag==",
+       "license": "MIT",
+       "dependencies": {
+-        "@babel/types": "^7.29.7"
++        "@babel/types": "^7.29.11"
+       },
+       "bin": {
+         "parser": "bin/babel-parser.js"
+@@ -477,6 +479,107 @@
+         "node": ">=6.0.0"
+       }
+     },
++    "node_modules/@babel/plugin-bugfix-firefox-class-in-computed-class-key": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-bugfix-firefox-class-in-computed-class-key/-/plugin-bugfix-firefox-class-in-computed-class-key-7.29.7.tgz",
++      "integrity": "sha512-j8SrR0zLZrRsC09DlszEx8FpMiwukKffYXMK0d5LmOglO7vGG6sz/BR/20yHqWH+Lnn31JTt2PE3hIWNgM2J6w==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/traverse": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
++    "node_modules/@babel/plugin-bugfix-safari-class-field-initializer-scope": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-bugfix-safari-class-field-initializer-scope/-/plugin-bugfix-safari-class-field-initializer-scope-7.29.7.tgz",
++      "integrity": "sha512-r8j8escF+U2FUHo0KOhPUdMzUO+jp9fInva6+ACVAF3Y97Ev+5iNZwiqTghmzNeWwDkOPlYuTcfb1vDaoZKmAQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
++    "node_modules/@babel/plugin-bugfix-safari-id-destructuring-collision-in-function-expression": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-bugfix-safari-id-destructuring-collision-in-function-expression/-/plugin-bugfix-safari-id-destructuring-collision-in-function-expression-7.29.7.tgz",
++      "integrity": "sha512-GE1TFSiuFeGsCxmYXZl8HwoPrVlwe4rHPFE8weieGKZqnDORK+Ar3vgWMgW+AOxQ6/2TgLSKx9p6W7O4rC6qgQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
++    "node_modules/@babel/plugin-bugfix-safari-rest-destructuring-rhs-array": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-bugfix-safari-rest-destructuring-rhs-array/-/plugin-bugfix-safari-rest-destructuring-rhs-array-7.29.7.tgz",
++      "integrity": "sha512-oBNVCvnO5tND+xSopWvV8WNGfpTfgP4Zr/YXXSj8zfmcPktp5Ku/aZlsIowgSD4fjmgHn6sGmB9APVsU5zOdhA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/helper-skip-transparent-expression-wrappers": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
++    "node_modules/@babel/plugin-bugfix-v8-spread-parameters-in-optional-chaining": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-bugfix-v8-spread-parameters-in-optional-chaining/-/plugin-bugfix-v8-spread-parameters-in-optional-chaining-7.29.7.tgz",
++      "integrity": "sha512-QQt9qKHZ2sg/kivaLr7lnQr8HVrQDdBNSfCsTjiDxRuX/K5ORyKq+Bu8Xr0cDE3Dfkv0cw28Ve0EKyKMvulkOw==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/helper-skip-transparent-expression-wrappers": "^7.29.7",
++        "@babel/plugin-transform-optional-chaining": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.13.0"
++      }
++    },
++    "node_modules/@babel/plugin-bugfix-v8-static-class-fields-redefine-readonly": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-bugfix-v8-static-class-fields-redefine-readonly/-/plugin-bugfix-v8-static-class-fields-redefine-readonly-7.29.7.tgz",
++      "integrity": "sha512-pn6QacGLgvCcwc+syUhKE/qSjV2D1IHDB84RNxWYSt1mW3K/SCtjinZ2p0cETJxAWBjPy3K/1lHwG5BjjPxNlw==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/traverse": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
+     "node_modules/@babel/plugin-proposal-async-generator-functions": {
+       "version": "7.20.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-proposal-async-generator-functions/-/plugin-proposal-async-generator-functions-7.20.7.tgz",
+@@ -651,6 +754,19 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-proposal-private-property-in-object": {
++      "version": "7.21.0-placeholder-for-preset-env.2",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-proposal-private-property-in-object/-/plugin-proposal-private-property-in-object-7.21.0-placeholder-for-preset-env.2.tgz",
++      "integrity": "sha512-SOSkfJDddaM7mak6cPEpswyTRnuRltl429hMraQEglW+OkovnCzsiszTmsrlY//qLFjCpQDFRvjdm2wA5pPm9w==",
++      "license": "MIT",
++      "peer": true,
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
+     "node_modules/@babel/plugin-syntax-async-generators": {
+       "version": "7.8.4",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-syntax-async-generators/-/plugin-syntax-async-generators-7.8.4.tgz",
+@@ -720,6 +836,38 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-syntax-import-assertions": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-syntax-import-assertions/-/plugin-syntax-import-assertions-7.29.7.tgz",
++      "integrity": "sha512-/An1OCBN93thpBAGyfsK2pcf0jvju1SAtKkL2Ny++B5Sy6sqgzXDQH1cZxWbF96Wuk+bn41MDA9bLd4VVAw6rw==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-syntax-import-attributes": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-syntax-import-attributes/-/plugin-syntax-import-attributes-7.29.7.tgz",
++      "integrity": "sha512-zGYcYfq/WmZ4V+kBIXQon9dSSc8ircGZqw9ZaNhhGj9nZkeBu1jHLBDQqYYi5WA9uawvA2sIMbry2nCFhf5Djg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
+     "node_modules/@babel/plugin-syntax-jsx": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-syntax-jsx/-/plugin-syntax-jsx-7.29.7.tgz",
+@@ -822,6 +970,23 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-syntax-unicode-sets-regex": {
++      "version": "7.18.6",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-syntax-unicode-sets-regex/-/plugin-syntax-unicode-sets-regex-7.18.6.tgz",
++      "integrity": "sha512-727YkEAPwSIQTv5im8QHz3upqp92JTWhidIC81Tdx4VJYIte/VndKf1qKrfnnhPLiPghStWfvC/iFaMCQu7Nqg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-create-regexp-features-plugin": "^7.18.6",
++        "@babel/helper-plugin-utils": "^7.18.6"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
+     "node_modules/@babel/plugin-transform-arrow-functions": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-transform-arrow-functions/-/plugin-transform-arrow-functions-7.29.7.tgz",
+@@ -837,6 +1002,24 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-transform-async-generator-functions": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-async-generator-functions/-/plugin-transform-async-generator-functions-7.29.7.tgz",
++      "integrity": "sha512-d98gXZkgswvkyohMBABkhm3GeXhYj8psWfwQ2C7gtfrKGTykQa/iOIi+JJhwMjPlZ6Vm2XN+DCf3Es1EoG4ZLA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/helper-remap-async-to-generator": "^7.29.7",
++        "@babel/traverse": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
+     "node_modules/@babel/plugin-transform-async-to-generator": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-transform-async-to-generator/-/plugin-transform-async-to-generator-7.29.7.tgz",
+@@ -854,6 +1037,22 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-transform-block-scoped-functions": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-block-scoped-functions/-/plugin-transform-block-scoped-functions-7.29.7.tgz",
++      "integrity": "sha512-cUSmjh72N+rN4PrkFlN1dJwNCwjVp5d38/CQrEsFggkD10UiFlBFgdH3tv5dNsLuHY+3S8db2xCHjhZcv5WgvA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
+     "node_modules/@babel/plugin-transform-block-scoping": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-transform-block-scoping/-/plugin-transform-block-scoping-7.29.7.tgz",
+@@ -869,6 +1068,40 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-transform-class-properties": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-class-properties/-/plugin-transform-class-properties-7.29.7.tgz",
++      "integrity": "sha512-GtcpjFvanPfzNQi3eTitsCqtRRmmqzpy/A+yhTR1HaZo1Ly3EA8ZXxlPyHdR8/IuRMYc3E4wdGBewB2QKQjAaA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-create-class-features-plugin": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-class-static-block": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-class-static-block/-/plugin-transform-class-static-block-7.29.7.tgz",
++      "integrity": "sha512-kibJgmEdX2iMwsHY2tSZNDgj8PwIlCQz7FK9KuGKO8zsuoUwSEhoNnNVp/emKWrbY4HeO6kkXfdMqRKKKXBm2A==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-create-class-features-plugin": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.12.0"
++      }
++    },
+     "node_modules/@babel/plugin-transform-classes": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-transform-classes/-/plugin-transform-classes-7.29.7.tgz",
+@@ -921,12 +1154,293 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
+-    "node_modules/@babel/plugin-transform-export-namespace-from": {
++    "node_modules/@babel/plugin-transform-dotall-regex": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-dotall-regex/-/plugin-transform-dotall-regex-7.29.7.tgz",
++      "integrity": "sha512-3qc18hsD2RdZiyJNDNc7HQpv6xbncwh8FYtxNFFzclSyh/trPD9KkVR9BDECUjDLvb7yJVF15GfYUuC+LMkkiQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-create-regexp-features-plugin": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-duplicate-keys": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-duplicate-keys/-/plugin-transform-duplicate-keys-7.29.7.tgz",
++      "integrity": "sha512-6IvRRriEMqnBwD6chtxdLpMYCHWEzN+oL5cyQtjykya19UgzbmKhxmhZgKC/LHxS2nYr9Q/qYPZ5Lr6jOL9+yQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-duplicate-named-capturing-groups-regex": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-duplicate-named-capturing-groups-regex/-/plugin-transform-duplicate-named-capturing-groups-regex-7.29.7.tgz",
++      "integrity": "sha512-2wiIyo2BjtgU7HufSeDnL9L2O7zr8jmhFKuSr65VpRkUiRKRNpb0mdlk56+XPPKoIrfHqzbMuglDvZun0RISsA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-create-regexp-features-plugin": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-dynamic-import": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-dynamic-import/-/plugin-transform-dynamic-import-7.29.7.tgz",
++      "integrity": "sha512-giOlEm/EFjfjr+te9NsdjkUo2v4f8rS/SXPumRVHAtbNcyNlvtREkU1dZzaIDclNpnaVhlCqRdFKhJBjBikzLg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-explicit-resource-management": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-explicit-resource-management/-/plugin-transform-explicit-resource-management-7.29.7.tgz",
++      "integrity": "sha512-Rstj7coNz8sE+7Ju7ihpHLI564lsK5pUpNNlvptCIC/16E/S5hbl6n3kESPKdNRmqEWlpn5xpS5Q2dvXBsySLw==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/plugin-transform-destructuring": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-exponentiation-operator": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-exponentiation-operator/-/plugin-transform-exponentiation-operator-7.29.7.tgz",
++      "integrity": "sha512-zFpMOTLZBdW5LfObqcSbL6kefg4R4eLdmvS0wbN9M6D5Mym/sKm9toOoWyVOa+xDjvCnuWcHls2YonXwHvH3CQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-export-namespace-from": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-export-namespace-from/-/plugin-transform-export-namespace-from-7.29.7.tgz",
++      "integrity": "sha512-24B2nOy2TeJSMheqwPD4DDQOV/elLSIlKxjZt4i05H5AgdPdWR3n18HnNrcJ+j76WJd9gbwb9jPjNYUy6RautA==",
++      "license": "MIT",
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-flow-strip-types": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-flow-strip-types/-/plugin-transform-flow-strip-types-7.29.7.tgz",
++      "integrity": "sha512-wRHeUjUjCZnMHmiO5bRgjFLcoEh7JyTdByOW11ahhwNa4V0bmeGEaIvt51yq0zQp2yWIpqfxXXPyUP6GFJZHOQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/plugin-syntax-flow": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-for-of": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-for-of/-/plugin-transform-for-of-7.29.7.tgz",
++      "integrity": "sha512-zeSIHh0+E1Um1WJRXCFlHQYu2ieJNdivLLjlBEp+dIBu3S51n+SZZmIXjxnItw6pz56Cn+KvK68BIBVsxq2JiQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/helper-skip-transparent-expression-wrappers": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-function-name": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-function-name/-/plugin-transform-function-name-7.29.7.tgz",
++      "integrity": "sha512-otRWaHXE6fbAGkePvaj/kvs3HsqXfPhlnzwSOlnFgbqCPMd975dW+4wZ00WFBt+/YlBGcJwNrARQTOJOb4ZrIg==",
++      "license": "MIT",
++      "dependencies": {
++        "@babel/helper-compilation-targets": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/traverse": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-json-strings": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-json-strings/-/plugin-transform-json-strings-7.29.7.tgz",
++      "integrity": "sha512-RRnE2+eon1rJAq8MnoF1b5kTpY1vU88twHcvcKMrsqP/jxIRqDVs9iJB5fqPuqyeFAW0wJo4MlUIPpQCq/aRsg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-literals": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-literals/-/plugin-transform-literals-7.29.7.tgz",
++      "integrity": "sha512-DZ/oLP21ZuWx1vKqnoNv6/tvEK48AQOBRai40CX9dTjGluvT/YZCyY3rryDtyUqCEoyNroy5KKPwX2iQCiRvyw==",
++      "license": "MIT",
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-logical-assignment-operators": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-logical-assignment-operators/-/plugin-transform-logical-assignment-operators-7.29.7.tgz",
++      "integrity": "sha512-A0H91hh6W8MFRkp5TqJmMr39jzGD1A1E1Ysiv2O06Sfbhkapm+XyIzxWCEh5kqwOZ1/8QZ0dY3SeQ7XBqfJd5Q==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-member-expression-literals": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-member-expression-literals/-/plugin-transform-member-expression-literals-7.29.7.tgz",
++      "integrity": "sha512-hl1kwFZCCiDyfH25Xmco9jTrkPgnS9pmOzSG7W5I4SaGbLeqKv417hcU2RKmaxoPEgsoJh7ZPOrnPGq99bHoUg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-modules-amd": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-modules-amd/-/plugin-transform-modules-amd-7.29.7.tgz",
++      "integrity": "sha512-fxtQoH3m5ywUSIfaH0FGCzWu4McsYon5bD3K4XnskC7f+OyQMj7rsOMi4NvvmJ83WwBAg4UCe+ov4VZlqEvyew==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-module-transforms": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-modules-commonjs": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-modules-commonjs/-/plugin-transform-modules-commonjs-7.29.7.tgz",
++      "integrity": "sha512-j0vCldybPC5b5dwCQOJ21uKtHzt7hxLygJTg9eF1ScfaikEDNfzn94XoW5Fi+seBR0nCyL23xaBFFkq7dTM8XQ==",
++      "license": "MIT",
++      "dependencies": {
++        "@babel/helper-module-transforms": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-modules-systemjs": {
++      "version": "7.29.8",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-modules-systemjs/-/plugin-transform-modules-systemjs-7.29.8.tgz",
++      "integrity": "sha512-6iSnEK0zlkLKU4heofK/AdmRD4e2SHVpJMtrwnTCzhnaM98ria4rTrOXBBi45BTTYnJtO8txnPsX4fChYXkmeA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-module-transforms": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/helper-validator-identifier": "^7.29.7",
++        "@babel/traverse": "^7.29.8"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-modules-umd": {
+       "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-export-namespace-from/-/plugin-transform-export-namespace-from-7.29.7.tgz",
+-      "integrity": "sha512-24B2nOy2TeJSMheqwPD4DDQOV/elLSIlKxjZt4i05H5AgdPdWR3n18HnNrcJ+j76WJd9gbwb9jPjNYUy6RautA==",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-modules-umd/-/plugin-transform-modules-umd-7.29.7.tgz",
++      "integrity": "sha512-B4UkaTK3QpgCwJnrxKfMPKdo92CN7OKXAlpAAnM3UPu0Q0lCCk57ylA9AJbRy2v8dDKOPAAWcoR6CMyeoHwRCA==",
+       "license": "MIT",
++      "peer": true,
+       "dependencies": {
++        "@babel/helper-module-transforms": "^7.29.7",
+         "@babel/helper-plugin-utils": "^7.29.7"
+       },
+       "engines": {
+@@ -936,31 +1450,30 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
+-    "node_modules/@babel/plugin-transform-flow-strip-types": {
++    "node_modules/@babel/plugin-transform-named-capturing-groups-regex": {
+       "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-flow-strip-types/-/plugin-transform-flow-strip-types-7.29.7.tgz",
+-      "integrity": "sha512-wRHeUjUjCZnMHmiO5bRgjFLcoEh7JyTdByOW11ahhwNa4V0bmeGEaIvt51yq0zQp2yWIpqfxXXPyUP6GFJZHOQ==",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-named-capturing-groups-regex/-/plugin-transform-named-capturing-groups-regex-7.29.7.tgz",
++      "integrity": "sha512-vuFoLwr4qnv2xbZ16SQd6uPcH5FNrLHhk/Jzo++0XJFcaDsr4gjJVg6j398oMHiC+83k/GiBzviwF5KBJkPUtQ==",
+       "license": "MIT",
+       "dependencies": {
+-        "@babel/helper-plugin-utils": "^7.29.7",
+-        "@babel/plugin-syntax-flow": "^7.29.7"
++        "@babel/helper-create-regexp-features-plugin": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
+       },
+       "engines": {
+         "node": ">=6.9.0"
+       },
+       "peerDependencies": {
+-        "@babel/core": "^7.0.0-0"
++        "@babel/core": "^7.0.0"
+       }
+     },
+-    "node_modules/@babel/plugin-transform-function-name": {
++    "node_modules/@babel/plugin-transform-new-target": {
+       "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-function-name/-/plugin-transform-function-name-7.29.7.tgz",
+-      "integrity": "sha512-otRWaHXE6fbAGkePvaj/kvs3HsqXfPhlnzwSOlnFgbqCPMd975dW+4wZ00WFBt+/YlBGcJwNrARQTOJOb4ZrIg==",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-new-target/-/plugin-transform-new-target-7.29.7.tgz",
++      "integrity": "sha512-fEo41GmsOUhOBlw8ioo6zvjX5Xc2Lqkzlyfqbpsk3eB6TReV18uhxZ0esfEokVbY2+PVJAQHNKxER6lGrzNd3A==",
+       "license": "MIT",
++      "peer": true,
+       "dependencies": {
+-        "@babel/helper-compilation-targets": "^7.29.7",
+-        "@babel/helper-plugin-utils": "^7.29.7",
+-        "@babel/traverse": "^7.29.7"
++        "@babel/helper-plugin-utils": "^7.29.7"
+       },
+       "engines": {
+         "node": ">=6.9.0"
+@@ -969,10 +1482,10 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
+-    "node_modules/@babel/plugin-transform-literals": {
++    "node_modules/@babel/plugin-transform-nullish-coalescing-operator": {
+       "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-literals/-/plugin-transform-literals-7.29.7.tgz",
+-      "integrity": "sha512-DZ/oLP21ZuWx1vKqnoNv6/tvEK48AQOBRai40CX9dTjGluvT/YZCyY3rryDtyUqCEoyNroy5KKPwX2iQCiRvyw==",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-nullish-coalescing-operator/-/plugin-transform-nullish-coalescing-operator-7.29.7.tgz",
++      "integrity": "sha512-idmp1dFaekP9GbcMvG24Kvw2BfhFZjHnNJCkV4WuIY4PskJzwI3f1N5OdgYke38T7rftO6ERulFRn2cFeZwRkg==",
+       "license": "MIT",
+       "dependencies": {
+         "@babel/helper-plugin-utils": "^7.29.7"
+@@ -984,13 +1497,13 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
+-    "node_modules/@babel/plugin-transform-modules-commonjs": {
++    "node_modules/@babel/plugin-transform-numeric-separator": {
+       "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-modules-commonjs/-/plugin-transform-modules-commonjs-7.29.7.tgz",
+-      "integrity": "sha512-j0vCldybPC5b5dwCQOJ21uKtHzt7hxLygJTg9eF1ScfaikEDNfzn94XoW5Fi+seBR0nCyL23xaBFFkq7dTM8XQ==",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-numeric-separator/-/plugin-transform-numeric-separator-7.29.7.tgz",
++      "integrity": "sha512-zR7fv/z14OjgHl4AgRtkDBvBMhIzCxqV/qN/2BCRC7LjFwvuzjYe7gDWxC4Wl/SNsLM6SE1IWvRPYMgSJaUvNw==",
+       "license": "MIT",
++      "peer": true,
+       "dependencies": {
+-        "@babel/helper-module-transforms": "^7.29.7",
+         "@babel/helper-plugin-utils": "^7.29.7"
+       },
+       "engines": {
+@@ -1000,29 +1513,34 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
+-    "node_modules/@babel/plugin-transform-named-capturing-groups-regex": {
++    "node_modules/@babel/plugin-transform-object-rest-spread": {
+       "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-named-capturing-groups-regex/-/plugin-transform-named-capturing-groups-regex-7.29.7.tgz",
+-      "integrity": "sha512-vuFoLwr4qnv2xbZ16SQd6uPcH5FNrLHhk/Jzo++0XJFcaDsr4gjJVg6j398oMHiC+83k/GiBzviwF5KBJkPUtQ==",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-object-rest-spread/-/plugin-transform-object-rest-spread-7.29.7.tgz",
++      "integrity": "sha512-Ld98jn4c0smUywL57m7SgsHq3OpThOa6LqZJif3G6jYOovPleoFhVrBJ1WegRApSFB2wu4+RelAj9AC9G08Z4A==",
+       "license": "MIT",
+       "dependencies": {
+-        "@babel/helper-create-regexp-features-plugin": "^7.29.7",
+-        "@babel/helper-plugin-utils": "^7.29.7"
++        "@babel/helper-compilation-targets": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/plugin-transform-destructuring": "^7.29.7",
++        "@babel/plugin-transform-parameters": "^7.29.7",
++        "@babel/traverse": "^7.29.7"
+       },
+       "engines": {
+         "node": ">=6.9.0"
+       },
+       "peerDependencies": {
+-        "@babel/core": "^7.0.0"
++        "@babel/core": "^7.0.0-0"
+       }
+     },
+-    "node_modules/@babel/plugin-transform-nullish-coalescing-operator": {
++    "node_modules/@babel/plugin-transform-object-super": {
+       "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-nullish-coalescing-operator/-/plugin-transform-nullish-coalescing-operator-7.29.7.tgz",
+-      "integrity": "sha512-idmp1dFaekP9GbcMvG24Kvw2BfhFZjHnNJCkV4WuIY4PskJzwI3f1N5OdgYke38T7rftO6ERulFRn2cFeZwRkg==",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-object-super/-/plugin-transform-object-super-7.29.7.tgz",
++      "integrity": "sha512-Ea/diGcw0twB5IlZPO5sgET6fJsLJqPABqTuFWIR+iMPGPZJkATEIWx0wa+aEQ5UY1CBQyP/gkAiLEqn1vBiQA==",
+       "license": "MIT",
++      "peer": true,
+       "dependencies": {
+-        "@babel/helper-plugin-utils": "^7.29.7"
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/helper-replace-supers": "^7.29.7"
+       },
+       "engines": {
+         "node": ">=6.9.0"
+@@ -1031,17 +1549,14 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
+-    "node_modules/@babel/plugin-transform-object-rest-spread": {
++    "node_modules/@babel/plugin-transform-optional-catch-binding": {
+       "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-object-rest-spread/-/plugin-transform-object-rest-spread-7.29.7.tgz",
+-      "integrity": "sha512-Ld98jn4c0smUywL57m7SgsHq3OpThOa6LqZJif3G6jYOovPleoFhVrBJ1WegRApSFB2wu4+RelAj9AC9G08Z4A==",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-optional-catch-binding/-/plugin-transform-optional-catch-binding-7.29.7.tgz",
++      "integrity": "sha512-sLsyndxK2VwX6yNUOakMb7Sh553ZTe/vVM1XJ+9Z5aW1ytsc8xOIwmyk05NNjN60vkc5/KqoTH6hB4V41LJhng==",
+       "license": "MIT",
++      "peer": true,
+       "dependencies": {
+-        "@babel/helper-compilation-targets": "^7.29.7",
+-        "@babel/helper-plugin-utils": "^7.29.7",
+-        "@babel/plugin-transform-destructuring": "^7.29.7",
+-        "@babel/plugin-transform-parameters": "^7.29.7",
+-        "@babel/traverse": "^7.29.7"
++        "@babel/helper-plugin-utils": "^7.29.7"
+       },
+       "engines": {
+         "node": ">=6.9.0"
+@@ -1114,6 +1629,22 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-transform-property-literals": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-property-literals/-/plugin-transform-property-literals-7.29.7.tgz",
++      "integrity": "sha512-bOMRLQuI0A5ZqHq3OWJ89/rXpJ/NJrbVhXiP4zwPGMs6kpcVsuTUNjwoE30K0Qm3mf48a/TnRYYD6vPNqcg6jA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
+     "node_modules/@babel/plugin-transform-react-display-name": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-transform-react-display-name/-/plugin-transform-react-display-name-7.29.7.tgz",
+@@ -1209,6 +1740,55 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-transform-regenerator": {
++      "version": "7.29.8",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-regenerator/-/plugin-transform-regenerator-7.29.8.tgz",
++      "integrity": "sha512-0UpIXPtdDtMXfnV2OJAVMLpj3H/92vmkA6lpSRakmycJvj3VUy6Xs1dM8tXRugupykr5WB+LpiVl0J8LMVg2mg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-regexp-modifiers": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-regexp-modifiers/-/plugin-transform-regexp-modifiers-7.29.7.tgz",
++      "integrity": "sha512-mB5Fs0VWrJ42ZCmc8114v60qetdaUVNkj9PmSZRmanCZM3S9hm0CFRLjRmYIsuXav14l2jvZ+4T8iiCGnhj3nQ==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-create-regexp-features-plugin": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-reserved-words": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-reserved-words/-/plugin-transform-reserved-words-7.29.7.tgz",
++      "integrity": "sha512-5+YhdpVgmfSmwZyLMftfaiffLRMHjzIRHFHHLdibcSyJm2pasMrKHrO3Ptrt2DRshjvpgjEJJ1zVW14WPq/6QA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
+     "node_modules/@babel/plugin-transform-runtime": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-transform-runtime/-/plugin-transform-runtime-7.29.7.tgz",
+@@ -1290,6 +1870,22 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-transform-typeof-symbol": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-typeof-symbol/-/plugin-transform-typeof-symbol-7.29.7.tgz",
++      "integrity": "sha512-223mNGoTkBiTEWFoK+Q6Go3tueMRclO8vxxxxquNCYuNI4jWOofFKJRRDu6SDrB8Sgo1UEGW9T4GAQ8ZyRso1A==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
+     "node_modules/@babel/plugin-transform-typescript": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-transform-typescript/-/plugin-transform-typescript-7.29.7.tgz",
+@@ -1309,6 +1905,39 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-transform-unicode-escapes": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-unicode-escapes/-/plugin-transform-unicode-escapes-7.29.7.tgz",
++      "integrity": "sha512-jCfXxSjf94lf4E0hKE0AByxF6F3/pVFqRdUUNkDJhsY0m1ZKjnN6ZYyMeHNpzflxb/0q5b7t3p+BE+SLF1WOtA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/plugin-transform-unicode-property-regex": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-unicode-property-regex/-/plugin-transform-unicode-property-regex-7.29.7.tgz",
++      "integrity": "sha512-OgZ+zoAJgZLUCunsTRQ5LAjOywDv5zzZ2/hQ5aMw1pGXyY2rtE8/chXYUmu3AlVHKpm10KEdG9aMwbI/K76ZGw==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-create-regexp-features-plugin": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
+     "node_modules/@babel/plugin-transform-unicode-regex": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/plugin-transform-unicode-regex/-/plugin-transform-unicode-regex-7.29.7.tgz",
+@@ -1325,6 +1954,123 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/plugin-transform-unicode-sets-regex": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/plugin-transform-unicode-sets-regex/-/plugin-transform-unicode-sets-regex-7.29.7.tgz",
++      "integrity": "sha512-BLOhLht9DOJwIxlmp91wHvkXv1lguuHS3/FwUO8HL1H0u8s4hR1gASVFyilu9iGtcTRYqjTZmlsFFeQletntEg==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-create-regexp-features-plugin": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0"
++      }
++    },
++    "node_modules/@babel/preset-env": {
++      "version": "7.29.7",
++      "resolved": "https://registry.npmjs.org/@babel/preset-env/-/preset-env-7.29.7.tgz",
++      "integrity": "sha512-GYzX36n1nsciIb0uyH0GHwxwtNwPQIcpxSeiVLDtG/B7jB5xXgchnmL1f/jCX5o+pwnaDBtO60ONSJhEBJfxYA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/compat-data": "^7.29.7",
++        "@babel/helper-compilation-targets": "^7.29.7",
++        "@babel/helper-plugin-utils": "^7.29.7",
++        "@babel/helper-validator-option": "^7.29.7",
++        "@babel/plugin-bugfix-firefox-class-in-computed-class-key": "^7.29.7",
++        "@babel/plugin-bugfix-safari-class-field-initializer-scope": "^7.29.7",
++        "@babel/plugin-bugfix-safari-id-destructuring-collision-in-function-expression": "^7.29.7",
++        "@babel/plugin-bugfix-safari-rest-destructuring-rhs-array": "^7.29.7",
++        "@babel/plugin-bugfix-v8-spread-parameters-in-optional-chaining": "^7.29.7",
++        "@babel/plugin-bugfix-v8-static-class-fields-redefine-readonly": "^7.29.7",
++        "@babel/plugin-proposal-private-property-in-object": "7.21.0-placeholder-for-preset-env.2",
++        "@babel/plugin-syntax-import-assertions": "^7.29.7",
++        "@babel/plugin-syntax-import-attributes": "^7.29.7",
++        "@babel/plugin-syntax-unicode-sets-regex": "^7.18.6",
++        "@babel/plugin-transform-arrow-functions": "^7.29.7",
++        "@babel/plugin-transform-async-generator-functions": "^7.29.7",
++        "@babel/plugin-transform-async-to-generator": "^7.29.7",
++        "@babel/plugin-transform-block-scoped-functions": "^7.29.7",
++        "@babel/plugin-transform-block-scoping": "^7.29.7",
++        "@babel/plugin-transform-class-properties": "^7.29.7",
++        "@babel/plugin-transform-class-static-block": "^7.29.7",
++        "@babel/plugin-transform-classes": "^7.29.7",
++        "@babel/plugin-transform-computed-properties": "^7.29.7",
++        "@babel/plugin-transform-destructuring": "^7.29.7",
++        "@babel/plugin-transform-dotall-regex": "^7.29.7",
++        "@babel/plugin-transform-duplicate-keys": "^7.29.7",
++        "@babel/plugin-transform-duplicate-named-capturing-groups-regex": "^7.29.7",
++        "@babel/plugin-transform-dynamic-import": "^7.29.7",
++        "@babel/plugin-transform-explicit-resource-management": "^7.29.7",
++        "@babel/plugin-transform-exponentiation-operator": "^7.29.7",
++        "@babel/plugin-transform-export-namespace-from": "^7.29.7",
++        "@babel/plugin-transform-for-of": "^7.29.7",
++        "@babel/plugin-transform-function-name": "^7.29.7",
++        "@babel/plugin-transform-json-strings": "^7.29.7",
++        "@babel/plugin-transform-literals": "^7.29.7",
++        "@babel/plugin-transform-logical-assignment-operators": "^7.29.7",
++        "@babel/plugin-transform-member-expression-literals": "^7.29.7",
++        "@babel/plugin-transform-modules-amd": "^7.29.7",
++        "@babel/plugin-transform-modules-commonjs": "^7.29.7",
++        "@babel/plugin-transform-modules-systemjs": "^7.29.7",
++        "@babel/plugin-transform-modules-umd": "^7.29.7",
++        "@babel/plugin-transform-named-capturing-groups-regex": "^7.29.7",
++        "@babel/plugin-transform-new-target": "^7.29.7",
++        "@babel/plugin-transform-nullish-coalescing-operator": "^7.29.7",
++        "@babel/plugin-transform-numeric-separator": "^7.29.7",
++        "@babel/plugin-transform-object-rest-spread": "^7.29.7",
++        "@babel/plugin-transform-object-super": "^7.29.7",
++        "@babel/plugin-transform-optional-catch-binding": "^7.29.7",
++        "@babel/plugin-transform-optional-chaining": "^7.29.7",
++        "@babel/plugin-transform-parameters": "^7.29.7",
++        "@babel/plugin-transform-private-methods": "^7.29.7",
++        "@babel/plugin-transform-private-property-in-object": "^7.29.7",
++        "@babel/plugin-transform-property-literals": "^7.29.7",
++        "@babel/plugin-transform-regenerator": "^7.29.7",
++        "@babel/plugin-transform-regexp-modifiers": "^7.29.7",
++        "@babel/plugin-transform-reserved-words": "^7.29.7",
++        "@babel/plugin-transform-shorthand-properties": "^7.29.7",
++        "@babel/plugin-transform-spread": "^7.29.7",
++        "@babel/plugin-transform-sticky-regex": "^7.29.7",
++        "@babel/plugin-transform-template-literals": "^7.29.7",
++        "@babel/plugin-transform-typeof-symbol": "^7.29.7",
++        "@babel/plugin-transform-unicode-escapes": "^7.29.7",
++        "@babel/plugin-transform-unicode-property-regex": "^7.29.7",
++        "@babel/plugin-transform-unicode-regex": "^7.29.7",
++        "@babel/plugin-transform-unicode-sets-regex": "^7.29.7",
++        "@babel/preset-modules": "0.1.6-no-external-plugins",
++        "babel-plugin-polyfill-corejs2": "^0.4.15",
++        "babel-plugin-polyfill-corejs3": "^0.14.0",
++        "babel-plugin-polyfill-regenerator": "^0.6.6",
++        "core-js-compat": "^3.48.0",
++        "semver": "^6.3.1"
++      },
++      "engines": {
++        "node": ">=6.9.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0"
++      }
++    },
++    "node_modules/@babel/preset-env/node_modules/babel-plugin-polyfill-corejs3": {
++      "version": "0.14.2",
++      "resolved": "https://registry.npmjs.org/babel-plugin-polyfill-corejs3/-/babel-plugin-polyfill-corejs3-0.14.2.tgz",
++      "integrity": "sha512-coWpDLJ410R781Npmn/SIBZEsAetR4xVi0SxLMXPaMO4lSf1MwnkGYMtkFxew0Dn8B3/CpbpYxN0JCgg8mn67g==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-define-polyfill-provider": "^0.6.8",
++        "core-js-compat": "^3.48.0"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.4.0 || ^8.0.0-0 <8.0.0"
++      }
++    },
+     "node_modules/@babel/preset-flow": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/preset-flow/-/preset-flow-7.29.7.tgz",
+@@ -1342,6 +2088,21 @@
+         "@babel/core": "^7.0.0-0"
+       }
+     },
++    "node_modules/@babel/preset-modules": {
++      "version": "0.1.6-no-external-plugins",
++      "resolved": "https://registry.npmjs.org/@babel/preset-modules/-/preset-modules-0.1.6-no-external-plugins.tgz",
++      "integrity": "sha512-HrcgcIESLm9aIR842yhJ5RWan/gebQUJ6E/E5+rf0y9o6oj7w0Br+sWuL6kEQ/o/AdfvR1Je9jG18/gnpwjEyA==",
++      "license": "MIT",
++      "peer": true,
++      "dependencies": {
++        "@babel/helper-plugin-utils": "^7.0.0",
++        "@babel/types": "^7.4.4",
++        "esutils": "^2.0.2"
++      },
++      "peerDependencies": {
++        "@babel/core": "^7.0.0-0 || ^8.0.0-0 <8.0.0"
++      }
++    },
+     "node_modules/@babel/preset-react": {
+       "version": "7.29.7",
+       "resolved": "https://registry.npmjs.org/@babel/preset-react/-/preset-react-7.29.7.tgz",
+@@ -1424,17 +2185,17 @@
+       }
+     },
+     "node_modules/@babel/traverse": {
+-      "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/traverse/-/traverse-7.29.7.tgz",
+-      "integrity": "sha512-EhlfNQtZ+NK22w5BM61ciuiq1m58ed33Wr1Xan//ZRTy6hgjnwyCffRYwzsGXdASJSUJ1guZILsErh1eQcl+zw==",
++      "version": "7.29.10",
++      "resolved": "https://registry.npmjs.org/@babel/traverse/-/traverse-7.29.10.tgz",
++      "integrity": "sha512-B3lYAs2nkKskbgQ1nfy8Ma9ao9Q1rntTAQHrzzyDuj+TSO+X3le6PfWwqDvodsb+OumE10eMFfuMCTQSQ5iuIQ==",
+       "license": "MIT",
+       "dependencies": {
+         "@babel/code-frame": "^7.29.7",
+-        "@babel/generator": "^7.29.7",
++        "@babel/generator": "^7.29.8",
+         "@babel/helper-globals": "^7.29.7",
+-        "@babel/parser": "^7.29.7",
++        "@babel/parser": "^7.29.9",
+         "@babel/template": "^7.29.7",
+-        "@babel/types": "^7.29.7",
++        "@babel/types": "^7.29.8",
+         "debug": "^4.3.1"
+       },
+       "engines": {
+@@ -1442,12 +2203,12 @@
+       }
+     },
+     "node_modules/@babel/types": {
+-      "version": "7.29.7",
+-      "resolved": "https://registry.npmjs.org/@babel/types/-/types-7.29.7.tgz",
+-      "integrity": "sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==",
++      "version": "7.29.11",
++      "resolved": "https://registry.npmjs.org/@babel/types/-/types-7.29.11.tgz",
++      "integrity": "sha512-WCsemW40Cpc6gouC1SrY6PBaZ+oLRlEVY9XBvZBI7il/HyUrb2nJ505wE1MHEFyDZNnrWDEuy4jL50WVHfTTSQ==",
+       "license": "MIT",
+       "dependencies": {
+-        "@babel/helper-string-parser": "^7.29.7",
++        "@babel/helper-string-parser": "^7.29.11",
+         "@babel/helper-validator-identifier": "^7.29.7"
+       },
+       "engines": {
+@@ -4591,6 +5352,80 @@
+         "@sinonjs/commons": "^3.0.0"
+       }
+     },
++    "node_modules/@supabase/auth-js": {
++      "version": "2.65.0",
++      "resolved": "https://registry.npmjs.org/@supabase/auth-js/-/auth-js-2.65.0.tgz",
++      "integrity": "sha512-+wboHfZufAE2Y612OsKeVP4rVOeGZzzMLD/Ac3HrTQkkY4qXNjI6Af9gtmxwccE5nFvTiF114FEbIQ1hRq5uUw==",
++      "license": "MIT",
++      "dependencies": {
++        "@supabase/node-fetch": "^2.6.14"
++      }
++    },
++    "node_modules/@supabase/functions-js": {
++      "version": "2.4.1",
++      "resolved": "https://registry.npmjs.org/@supabase/functions-js/-/functions-js-2.4.1.tgz",
++      "integrity": "sha512-8sZ2ibwHlf+WkHDUZJUXqqmPvWQ3UHN0W30behOJngVh/qHHekhJLCFbh0AjkE9/FqqXtf9eoVvmYgfCLk5tNA==",
++      "license": "MIT",
++      "dependencies": {
++        "@supabase/node-fetch": "^2.6.14"
++      }
++    },
++    "node_modules/@supabase/node-fetch": {
++      "version": "2.6.15",
++      "resolved": "https://registry.npmjs.org/@supabase/node-fetch/-/node-fetch-2.6.15.tgz",
++      "integrity": "sha512-1ibVeYUacxWYi9i0cf5efil6adJ9WRyZBLivgjs+AUpewx1F3xPi7gLgaASI2SmIQxPoCEjAsLAzKPgMJVgOUQ==",
++      "license": "MIT",
++      "dependencies": {
++        "whatwg-url": "^5.0.0"
++      },
++      "engines": {
++        "node": "4.x || >=6.0.0"
++      }
++    },
++    "node_modules/@supabase/postgrest-js": {
++      "version": "1.16.1",
++      "resolved": "https://registry.npmjs.org/@supabase/postgrest-js/-/postgrest-js-1.16.1.tgz",
++      "integrity": "sha512-EOSEZFm5pPuCPGCmLF1VOCS78DfkSz600PBuvBND/IZmMciJ1pmsS3ss6TkB6UkuvTybYiBh7gKOYyxoEO3USA==",
++      "license": "MIT",
++      "dependencies": {
++        "@supabase/node-fetch": "^2.6.14"
++      }
++    },
++    "node_modules/@supabase/realtime-js": {
++      "version": "2.10.2",
++      "resolved": "https://registry.npmjs.org/@supabase/realtime-js/-/realtime-js-2.10.2.tgz",
++      "integrity": "sha512-qyCQaNg90HmJstsvr2aJNxK2zgoKh9ZZA8oqb7UT2LCh3mj9zpa3Iwu167AuyNxsxrUE8eEJ2yH6wLCij4EApA==",
++      "license": "MIT",
++      "dependencies": {
++        "@supabase/node-fetch": "^2.6.14",
++        "@types/phoenix": "^1.5.4",
++        "@types/ws": "^8.5.10",
++        "ws": "^8.14.2"
++      }
++    },
++    "node_modules/@supabase/storage-js": {
++      "version": "2.7.0",
++      "resolved": "https://registry.npmjs.org/@supabase/storage-js/-/storage-js-2.7.0.tgz",
++      "integrity": "sha512-iZenEdO6Mx9iTR6T7wC7sk6KKsoDPLq8rdu5VRy7+JiT1i8fnqfcOr6mfF2Eaqky9VQzhP8zZKQYjzozB65Rig==",
++      "license": "MIT",
++      "dependencies": {
++        "@supabase/node-fetch": "^2.6.14"
++      }
++    },
++    "node_modules/@supabase/supabase-js": {
++      "version": "2.45.4",
++      "resolved": "https://registry.npmjs.org/@supabase/supabase-js/-/supabase-js-2.45.4.tgz",
++      "integrity": "sha512-E5p8/zOLaQ3a462MZnmnz03CrduA5ySH9hZyL03Y+QZLIOO4/Gs8Rdy4ZCKDHsN7x0xdanVEWWFN3pJFQr9/hg==",
++      "license": "MIT",
++      "dependencies": {
++        "@supabase/auth-js": "2.65.0",
++        "@supabase/functions-js": "2.4.1",
++        "@supabase/node-fetch": "2.6.15",
++        "@supabase/postgrest-js": "1.16.1",
++        "@supabase/realtime-js": "2.10.2",
++        "@supabase/storage-js": "2.7.0"
++      }
++    },
+     "node_modules/@szmarczak/http-timer": {
+       "version": "4.0.6",
+       "resolved": "https://registry.npmjs.org/@szmarczak/http-timer/-/http-timer-4.0.6.tgz",
+@@ -4679,6 +5514,12 @@
+         "@types/node": "*"
+       }
+     },
++    "node_modules/@types/phoenix": {
++      "version": "1.6.8",
++      "resolved": "https://registry.npmjs.org/@types/phoenix/-/phoenix-1.6.8.tgz",
++      "integrity": "sha512-8uBiGk2kDk+e0/9eq8CWuDG5VLrS50roV4doR3xn21/EL8olbWSi2TBNa/CFJS00VLOuawH/UGQQsn+2W8tNrA==",
++      "license": "MIT"
++    },
+     "node_modules/@types/responselike": {
+       "version": "1.0.3",
+       "resolved": "https://registry.npmjs.org/@types/responselike/-/responselike-1.0.3.tgz",
+@@ -4694,6 +5535,15 @@
+       "integrity": "sha512-9aEbYZ3TbYMznPdcdr3SmIrLXwC/AKZXQeCf9Pgao5CKb8CyHuEX5jzWPTkvregvhRJHcpRO6BFoGW9ycaOkYw==",
+       "license": "MIT"
+     },
++    "node_modules/@types/ws": {
++      "version": "8.18.2",
++      "resolved": "https://registry.npmjs.org/@types/ws/-/ws-8.18.2.tgz",
++      "integrity": "sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==",
++      "license": "MIT",
++      "dependencies": {
++        "@types/node": "*"
++      }
++    },
+     "node_modules/@types/yargs": {
+       "version": "13.0.12",
+       "resolved": "https://registry.npmjs.org/@types/yargs/-/yargs-13.0.12.tgz",
+@@ -6850,6 +7700,16 @@
+         "node": ">=4"
+       }
+     },
++    "node_modules/esutils": {
++      "version": "2.0.3",
++      "resolved": "https://registry.npmjs.org/esutils/-/esutils-2.0.3.tgz",
++      "integrity": "sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==",
++      "license": "BSD-2-Clause",
++      "peer": true,
++      "engines": {
++        "node": ">=0.10.0"
++      }
++    },
+     "node_modules/etag": {
+       "version": "1.8.1",
+       "resolved": "https://registry.npmjs.org/etag/-/etag-1.8.1.tgz",
+@@ -12056,6 +12916,18 @@
+         "react": ">=16.8"
+       }
+     },
++    "node_modules/react-native-url-polyfill": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/react-native-url-polyfill/-/react-native-url-polyfill-2.0.0.tgz",
++      "integrity": "sha512-My330Do7/DvKnEvwQc0WdcBnFPploYKp9CYlefDXzIdEaA+PAhDYllkvGeEroEzvc4Kzzj2O4yVdz8v6fjRvhA==",
++      "license": "MIT",
++      "dependencies": {
++        "whatwg-url-without-unicode": "8.0.0-3"
++      },
++      "peerDependencies": {
++        "react-native": "*"
++      }
++    },
+     "node_modules/react-native/node_modules/@jest/types": {
+       "version": "26.6.2",
+       "resolved": "https://registry.npmjs.org/@jest/types/-/types-26.6.2.tgz",
+diff --git a/package.json b/package.json
+index 212d346..735f3ca 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,8 @@
+     "start": "expo start",
+     "android": "expo start --android",
+     "ios": "expo start --ios",
+-    "web": "expo start --web"
++    "web": "expo start --web",
++    "test": "node scripts/test-edge-cases.mjs && node scripts/test-sync.mjs"
+   },
+   "dependencies": {
+     "@expo-google-fonts/heebo": "^0.4.2",
+@@ -16,6 +17,7 @@
+     "@react-navigation/material-top-tabs": "^6.6.14",
+     "@react-navigation/native": "^6.1.18",
+     "@react-navigation/native-stack": "^6.11.0",
++    "@supabase/supabase-js": "2.45.4",
+     "expo": "~51.0.28",
+     "expo-blur": "~13.0.3",
+     "expo-device": "~6.0.2",
+@@ -33,7 +35,8 @@
+     "react-native-safe-area-context": "4.10.5",
+     "react-native-screens": "3.31.1",
+     "react-native-svg": "15.2.0",
+-    "react-native-tab-view": "^3.5.2"
++    "react-native-tab-view": "^3.5.2",
++    "react-native-url-polyfill": "2.0.0"
+   },
+   "devDependencies": {
+     "@babel/core": "^7.24.0",
+diff --git a/scripts/test-sync.mjs b/scripts/test-sync.mjs
+new file mode 100644
+index 0000000..59ac2cf
+--- /dev/null
++++ b/scripts/test-sync.mjs
+@@ -0,0 +1,87 @@
++// בדיקות ללוגיקת הסנכרון עם My Day.
++// הרצה:  node scripts/test-sync.mjs
++import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
++import { tmpdir } from 'node:os';
++import { join } from 'node:path';
++
++const dir = mkdtempSync(join(tmpdir(), 'panmatz-sync-'));
++for (const f of ['date.js', 'fitness.js', 'syncRows.js']) {
++  const src = readFileSync(join('src/utils', f), 'utf8').replace(/from '\.\/(\w+)'/g, "from './$1.js'");
++  writeFileSync(join(dir, f), src);
++}
++const S = await import(join(dir, 'syncRows.js'));
++
++let pass = 0, fail = 0;
++const t = (name, fn) => {
++  try { fn(); console.log('  PASS ', name); pass++; }
++  catch (e) { console.log('  FAIL ', name, '->', e.message); fail++; }
++};
++const ok = (c, m) => { if (!c) throw new Error(m || 'assertion failed'); };
++
++const goal = (o = {}) => ({
++  id: 'pullups', name: 'מתח', tracking: 'measured', unit: 'חזרות', enabled: true,
++  start: 2, current: 5, final: 30, step: 1, lowerIsBetter: false, trainingDays: [0, 2], history: [], ...o,
++});
++const state = (o = {}) => ({ goals: [goal(), goal({ id: 'core', name: 'בטן', tracking: 'check', unit: '', trainingDays: [0] })], logs: {}, ...o });
++
++// 2026-10-25 = יום ראשון
++t('יעדי יום ראשון', () => {
++  const rows = S.rowsForDate(state(), '2026-10-25');
++  ok(rows.length === 2);
++  ok(rows[0].target === '5 חז׳', rows[0].target);
++  ok(rows[1].target === '');
++});
++t('יום שני בלי אימון', () => ok(S.rowsForDate(state(), '2026-10-26').length === 0));
++t('יעד כבוי לא נשלח', () => ok(S.rowsForDate(state({ goals: [goal({ enabled: false })] }), '2026-10-25').length === 0));
++t('זמן ריצה מעוצב', () => ok(S.goalTarget(goal({ unit: 'זמן', current: 580 })) === '9:40 דק׳'));
++
++t('diff: הכל חדש בפעם הראשונה', () => {
++  const cur = S.rowsForRange(state(), '2026-10-25', '2026-10-27');
++  ok(S.diffRows(cur, {}, '2026-10-25', '2026-10-25', '2026-10-27').length === 3);
++});
++t('diff: אין שינוי = אין שליחה', () => {
++  const cur = S.rowsForRange(state(), '2026-10-25', '2026-10-27');
++  ok(S.diffRows(cur, { ...cur }, '2026-10-25', '2026-10-25', '2026-10-27').length === 0);
++});
++t('diff: סימון נשלח', () => {
++  const before = S.rowsForRange(state(), '2026-10-25', '2026-10-25');
++  const after = S.rowsForRange(state({ logs: { '2026-10-25': { trained: true, goals: { pullups: { done: true } } } } }), '2026-10-25', '2026-10-25');
++  const d = S.diffRows(after, before, '2026-10-25', '2026-10-25', '2026-10-25');
++  ok(d.length === 1 && d[0].goal_id === 'pullups' && d[0].done === true);
++});
++t('diff: יעד שכובה היום → deleted, אבל לא בימים שעברו', () => {
++  const pushed = {
++    ...S.rowsForRange(state(), '2026-10-18', '2026-10-18'),
++    ...S.rowsForRange(state(), '2026-10-25', '2026-10-25'),
++  };
++  const after = state({ goals: [goal()] });
++  const cur = { ...S.rowsForRange(after, '2026-10-18', '2026-10-18'), ...S.rowsForRange(after, '2026-10-25', '2026-10-25') };
++  const d = S.diffRows(cur, pushed, '2026-10-25', '2026-10-18', '2026-10-25');
++  ok(d.length === 1 && d[0].deleted && d[0].date === '2026-10-25' && d[0].goal_id === 'core', JSON.stringify(d));
++});
++t('תור בלי כפילויות', () => {
++  let q = [];
++  q = S.enqueue(q, { date: 'd', goal_id: 'g', done: true });
++  q = S.enqueue(q, { date: 'd', goal_id: 'g', done: false });
++  ok(q.length === 1 && q[0].done === false);
++});
++t('applyDone מסמן יעד נמדד עם הערך הנוכחי', () => {
++  const s = S.applyDone(state(), '2026-10-25', 'pullups', true);
++  ok(s.logs['2026-10-25'].goals.pullups.done === true);
++  ok(s.logs['2026-10-25'].goals.pullups.value === 5);
++  ok(s.logs['2026-10-25'].trained === true);
++  ok(s.goals[0].history.length === 1);
++});
++t('applyDone ביטול', () => {
++  const s1 = S.applyDone(state(), '2026-10-25', 'core', true);
++  const s2 = S.applyDone(s1, '2026-10-25', 'core', false);
++  ok(!s2.logs['2026-10-25'].goals.core && s2.logs['2026-10-25'].trained === false);
++});
++t('applyDone ללא שינוי מחזיר את אותו אובייקט (בלי רינדור מיותר)', () => {
++  const s = state();
++  ok(S.applyDone(s, '2026-10-25', 'core', false) === s);
++  ok(S.applyDone(s, '2026-10-25', 'nope', true) === s);
++});
++
++console.log(`\n${pass} passed, ${fail} failed`);
++process.exit(fail ? 1 : 0);
+diff --git a/src/components/SyncSection.js b/src/components/SyncSection.js
+new file mode 100644
+index 0000000..07f79fc
+--- /dev/null
++++ b/src/components/SyncSection.js
+@@ -0,0 +1,168 @@
++import React, { useEffect, useState } from 'react';
++import { View, Text, Alert, ActivityIndicator, StyleSheet } from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import { Section, Row } from './Group';
++import Input from './Input';
++import Button from './Button';
++import { colors, space } from '../design/tokens';
++import { text } from '../design/typography';
++import { ltr } from '../design/rtl';
++import { useApp } from '../context/AppContext';
++import { supabaseConfigured, authErrorText } from '../sync/supabase';
++import {
++  getSyncStatus,
++  onSyncStatus,
++  syncNow,
++  signIn,
++  signUp,
++  signOut,
++  backupToCloud,
++  fetchBackup,
++  lastBackupTime,
++} from '../sync/panmatzSync';
++import { formatHebDate, dayKey } from '../utils/date';
++
++// ============================================================================
++//  סנכרון עם My Day + גיבוי לענן. תוספת בלבד — בלי התחברות הכל נשאר מקומי.
++// ============================================================================
++
++const when = (iso) => {
++  if (!iso) return null;
++  const d = new Date(iso);
++  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
++  return `${formatHebDate(dayKey(d))} · ${hm}`;
++};
++
++export default function SyncSection() {
++  const { state, restoreState } = useApp();
++  const [status, setStatus] = useState(getSyncStatus());
++  const [email, setEmail] = useState('');
++  const [password, setPassword] = useState('');
++  const [busy, setBusy] = useState(null);
++  const [msg, setMsg] = useState(null);
++  const [backupAt, setBackupAt] = useState(null);
++
++  useEffect(() => onSyncStatus(setStatus), []);
++  useEffect(() => {
++    if (status.user) lastBackupTime().then(setBackupAt).catch(() => {});
++  }, [status.user]);
++
++  if (!supabaseConfigured) return null; // בלי מפתחות — המסך נראה בדיוק כמו קודם
++
++  const run = (name, fn) => async () => {
++    setBusy(name);
++    setMsg(null);
++    try {
++      await fn();
++    } catch (e) {
++      setMsg({ error: true, text: authErrorText(e) });
++    } finally {
++      setBusy(null);
++    }
++  };
++
++  if (!status.user) {
++    return (
++      <Section
++        title="סנכרון עם My Day"
++        footer="התחברות חד-פעמית. אותו חשבון בשתי האפליקציות — ואז אימון שסומן כאן מסומן גם ב-My Day, ולהפך."
++      >
++        <Row>
++          <View style={styles.form}>
++            <Input value={email} onChangeText={setEmail} placeholder="אימייל" keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
++            <Input value={password} onChangeText={setPassword} placeholder="סיסמה (לפחות 6 תווים)" secureTextEntry autoCapitalize="none" />
++            {msg ? <Text style={[text.sub, msg.error ? styles.err : styles.ok]}>{msg.text}</Text> : null}
++            <Button
++              variant="primary"
++              label={busy === 'in' ? 'מתחבר…' : 'התחברות'}
++              disabled={!!busy || !email || !password}
++              onPress={run('in', () => signIn(email, password))}
++            />
++            <Button
++              label="אין לי חשבון — הרשמה"
++              disabled={!!busy || !email || password.length < 6}
++              onPress={run('up', async () => {
++                const ready = await signUp(email, password);
++                if (!ready) setMsg({ text: 'נשלח אימייל אישור. אשר אותו ואז לחץ "התחברות".' });
++              })}
++            />
++          </View>
++        </Row>
++      </Section>
++    );
++  }
++
++  const restore = () =>
++    Alert.alert(
++      'לשחזר מהגיבוי בענן?',
++      'כל הנתונים באפליקציה יוחלפו בנתונים מהגיבוי האחרון. אי אפשר לבטל.',
++      [
++        { text: 'ביטול', style: 'cancel' },
++        {
++          text: 'שחזור',
++          style: 'destructive',
++          onPress: run('restore', async () => {
++            const backup = await fetchBackup();
++            if (!backup?.state) {
++              setMsg({ error: true, text: 'עדיין אין גיבוי בענן' });
++              return;
++            }
++            restoreState(backup.state);
++            setMsg({ text: 'הנתונים שוחזרו מהגיבוי' });
++          }),
++        },
++      ]
++    );
++
++  return (
++    <Section
++      title="סנכרון עם My Day"
++      footer={msg?.text || (status.error ? `הסנכרון האחרון נכשל (${authErrorText(status.error)}). השינויים שמורים וישלחו כשיחזור החיבור.` : 'אימונים ויעדי היום מופיעים ב-My Day, וסימון בכל צד מתעדכן בשני.')}
++    >
++      <Row
++        title="מחובר"
++        subtitle={status.user.email}
++        leading={<Ionicons name="cloud-done-outline" size={22} color={colors.gold} />}
++        value={status.lastSync ? ltr(when(status.lastSync).split(' · ')[1]) : null}
++      />
++      <Row
++        title="סנכרון עכשיו"
++        leading={<Ionicons name="sync-outline" size={22} color={colors.ink2} />}
++        trailing={busy === 'sync' ? <ActivityIndicator color={colors.gold} /> : null}
++        onPress={run('sync', async () => {
++          await syncNow();
++          setMsg({ text: 'מסונכרן ✓' });
++        })}
++      />
++      <Row
++        title="גיבוי מלא לענן"
++        subtitle={backupAt ? `גיבוי אחרון: ${when(backupAt)}` : 'עוד לא נשמר גיבוי'}
++        leading={<Ionicons name="cloud-upload-outline" size={22} color={colors.ink2} />}
++        trailing={busy === 'backup' ? <ActivityIndicator color={colors.gold} /> : null}
++        onPress={run('backup', async () => {
++          const at = await backupToCloud(state);
++          setBackupAt(at);
++          setMsg({ text: 'כל הנתונים גובו לענן ✓' });
++        })}
++      />
++      <Row
++        title="שחזור מהגיבוי"
++        leading={<Ionicons name="cloud-download-outline" size={22} color={colors.ink2} />}
++        trailing={busy === 'restore' ? <ActivityIndicator color={colors.gold} /> : null}
++        onPress={restore}
++      />
++      <Row
++        title="התנתקות"
++        leading={<Ionicons name="log-out-outline" size={22} color={colors.red} />}
++        onPress={run('out', () => signOut())}
++      />
++    </Section>
++  );
++}
++
++const styles = StyleSheet.create({
++  form: { gap: space[3], paddingVertical: space[2] },
++  err: { color: colors.red },
++  ok: { color: colors.gold },
++});
++
+diff --git a/src/context/AppContext.js b/src/context/AppContext.js
+index a1cfb95..a3ec5bd 100644
+--- a/src/context/AppContext.js
++++ b/src/context/AppContext.js
+@@ -17,6 +17,7 @@ import {
+   cancelTrainingReminders,
+   sendReinforcement,
+ } from '../notifications';
++import { attachSync, notifyStateChanged } from '../sync/panmatzSync';
+ 
+ const AppContext = createContext(null);
+ 
+@@ -69,6 +70,8 @@ export function AppProvider({ children }) {
+   const [toast, setToast] = useState(null); // הודעת חיזוק קצרה בתוך האפליקציה
+   const [streakCelebration, setStreakCelebration] = useState(null); // 7 / 14 / 30...
+   const loadedRef = useRef(false);
++  const stateRef = useRef(null);
++  stateRef.current = state;
+ 
+   // טעינה ראשונית
+   useEffect(() => {
+@@ -96,6 +99,18 @@ export function AppProvider({ children }) {
+     if (state && loadedRef.current) saveState(state);
+   }, [state]);
+ 
++  // סנכרון עם My Day (תוספת בלבד): אם אין מפתחות או התחברות — לא קורה כלום
++  useEffect(
++    () => attachSync({
++      getState: () => stateRef.current,
++      update: (fn) => setState((s) => (s ? fn(s) : s)),
++    }),
++    []
++  );
++  useEffect(() => {
++    if (state && loadedRef.current) notifyStateChanged();
++  }, [state]);
++
+   // סנכרון תזכורות אימון עם ימי האימון והעדפות
+   useEffect(() => {
+     if (!state) return;
+@@ -352,8 +367,12 @@ export function AppProvider({ children }) {
+     });
+   };
+ 
++  // שחזור מגיבוי בענן — עובר דרך אותו מיזוג בטוח כמו טעינה רגילה
++  const restoreState = (raw) => setState(normalize(raw));
++
+   const value = {
+     state,
++    restoreState,
+     celebration,
+     dismissCelebration: () => setCelebration(null),
+     streakCelebration,
+diff --git a/src/screens/SettingsScreen.js b/src/screens/SettingsScreen.js
+index d00170a..5b3bc6d 100644
+--- a/src/screens/SettingsScreen.js
++++ b/src/screens/SettingsScreen.js
+@@ -4,6 +4,7 @@ import Screen from '../components/Screen';
+ import IconButton from '../components/IconButton';
+ import Toggle from '../components/Toggle';
+ import { Section, Row } from '../components/Group';
++import SyncSection from '../components/SyncSection';
+ import DateSheet from '../sheets/DateSheet';
+ import TimeSheet from '../sheets/TimeSheet';
+ import { colors, space } from '../design/tokens';
+@@ -122,8 +123,10 @@ export default function SettingsScreen({ navigation }) {
+         </Section>
+       ) : null}
+ 
++      <SyncSection />
++
+       <Text style={[text.caption, styles.footnote]}>
+-        הנתונים נשמרים על המכשיר הזה בלבד. אין חשבון ואין שרת.
++        הנתונים נשמרים על המכשיר הזה. בלי התחברות לסנכרון — אין חשבון ואין שרת.
+       </Text>
+ 
+       <TimeSheet
+diff --git a/src/sync/panmatzSync.js b/src/sync/panmatzSync.js
+new file mode 100644
+index 0000000..a8a1c52
+--- /dev/null
++++ b/src/sync/panmatzSync.js
+@@ -0,0 +1,286 @@
++// סנכרון דו-כיווני עם My Day דרך הטבלה panmatz_daily ב-Supabase.
++//
++//  • כל שינוי ביעדי היום או בסימון נכתב לטבלה (upsert).
++//  • מאזינים ל-Realtime: סימון שנעשה ב-My Day מעדכן את המצב המקומי.
++//  • אופליין: השינויים נשמרים בתור מקומי ונשלחים כשחוזר החיבור.
++//    "האחרון קובע" לפי updated_at (נאכף גם בשרת), ובלי כפילויות.
++//  • בלי מפתחות / בלי התחברות — כלום לא רץ, והאפליקציה עובדת כמו קודם.
++import { AppState } from 'react-native';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import { supabase, supabaseConfigured, currentUser } from './supabase';
++import { todayKey } from '../utils/date';
++import {
++  SYNC_BACK_DAYS,
++  SYNC_FORWARD_DAYS,
++  addDays,
++  rowKey,
++  rowsForRange,
++  diffRows,
++  enqueue,
++  applyDone,
++} from '../utils/syncRows';
++
++const TABLE = 'panmatz_daily';
++const META_KEY = 'elroi-panmatz-sync-v1'; // נפרד לגמרי ממפתח הנתונים של האפליקציה
++const ts = (v) => (v ? new Date(v).getTime() : 0);
++
++let meta = null; // { pushed: { key: row }, queue: [row+updated_at] }
++let host = null; // { getState, update }
++let channel = null;
++let debounce = null;
++const listeners = new Set();
++let status = { user: null, lastSync: null, error: null };
++
++function setStatus(patch) {
++  status = { ...status, ...patch };
++  listeners.forEach((fn) => fn(status));
++}
++export const getSyncStatus = () => status;
++export function onSyncStatus(fn) {
++  listeners.add(fn);
++  return () => listeners.delete(fn);
++}
++
++async function loadMeta() {
++  if (meta) return meta;
++  try {
++    const raw = await AsyncStorage.getItem(META_KEY);
++    meta = raw ? JSON.parse(raw) : null;
++  } catch {
++    meta = null;
++  }
++  if (!meta || typeof meta !== 'object') meta = { pushed: {}, queue: [] };
++  meta.pushed = meta.pushed || {};
++  meta.queue = meta.queue || [];
++  return meta;
++}
++
++async function saveMeta() {
++  try {
++    // שומרים רק חלון של ~חודש אחורה כדי שהקובץ לא יגדל
++    const cutoff = addDays(todayKey(), -35);
++    Object.keys(meta.pushed).forEach((k) => {
++      if (k.split('|')[0] < cutoff) delete meta.pushed[k];
++    });
++    await AsyncStorage.setItem(META_KEY, JSON.stringify(meta));
++  } catch {
++    // לא קריטי — ננסה שוב בשינוי הבא
++  }
++}
++
++// ---------------------------------------------------------------------------
++//  שליחה
++// ---------------------------------------------------------------------------
++async function queueChanges(state) {
++  const user = await currentUser();
++  if (!user || !state) return;
++  await loadMeta();
++  const today = todayKey();
++  const from = addDays(today, -SYNC_BACK_DAYS);
++  const to = addDays(today, SYNC_FORWARD_DAYS);
++  const changed = diffRows(rowsForRange(state, from, to), meta.pushed, today, from, to);
++  if (!changed.length) return;
++  const updated_at = new Date().toISOString();
++  changed.forEach((r) => {
++    meta.queue = enqueue(meta.queue, { ...r, updated_at });
++    meta.pushed[rowKey(r)] = r;
++  });
++  await saveMeta();
++}
++
++let flushing = null;
++export function flush() {
++  if (!flushing) {
++    flushing = (async () => {
++      try {
++        const user = await currentUser();
++        if (!user) return;
++        await loadMeta();
++        if (!meta.queue.length) return;
++        const batch = meta.queue.slice(0, 200);
++        const { error } = await supabase
++          .from(TABLE)
++          .upsert(batch.map((r) => ({ ...r, user_id: user.id })), { onConflict: 'user_id,date,goal_id' });
++        if (error) throw error;
++        const sent = new Set(batch.map((r) => `${rowKey(r)}|${r.updated_at}`));
++        meta.queue = meta.queue.filter((r) => !sent.has(`${rowKey(r)}|${r.updated_at}`));
++        await saveMeta();
++        setStatus({ lastSync: new Date().toISOString(), error: null });
++      } catch (e) {
++        setStatus({ error: e }); // נשאר בתור — יישלח כשיחזור החיבור
++      } finally {
++        flushing = null;
++      }
++    })();
++  }
++  return flushing;
++}
++
++// נקרא אחרי כל שינוי מצב (עם השהיה קטנה, כדי לאחד שינויים רצופים)
++export function notifyStateChanged() {
++  if (!supabaseConfigured || !host) return;
++  clearTimeout(debounce);
++  debounce = setTimeout(async () => {
++    try {
++      await queueChanges(host.getState());
++      await flush();
++    } catch {
++      // הסנכרון לעולם לא מפיל את האפליקציה
++    }
++  }, 700);
++}
++
++// ---------------------------------------------------------------------------
++//  קבלה
++// ---------------------------------------------------------------------------
++async function applyRemoteRows(rows) {
++  await loadMeta();
++  let touched = false;
++  const updates = [];
++  rows.forEach((r) => {
++    if (!r || !r.date || !r.goal_id) return;
++    const key = rowKey(r);
++    const mine = meta.queue.find((q) => rowKey(q) === key);
++    if (mine && ts(mine.updated_at) >= ts(r.updated_at)) return; // השינוי המקומי חדש יותר
++    if (mine) meta.queue = meta.queue.filter((q) => q !== mine); // השרת חדש יותר
++    if (r.deleted) return;
++    // מעדכנים את "מה שנשלח" לפני שמשנים את המצב, כדי שלא יישלח חזרה (הד)
++    const prev = meta.pushed[key] || { date: r.date, goal_id: r.goal_id, title: r.title, target: r.target, deleted: false };
++    meta.pushed[key] = { ...prev, done: !!r.done };
++    updates.push(r);
++    touched = true;
++  });
++  if (!touched) return;
++  await saveMeta();
++  host?.update((s) => updates.reduce((acc, r) => applyDone(acc, r.date, r.goal_id, !!r.done), s));
++}
++
++async function pull() {
++  const user = await currentUser();
++  if (!user) return;
++  const today = todayKey();
++  const { data, error } = await supabase
++    .from(TABLE)
++    .select('date, goal_id, title, target, done, deleted, updated_at')
++    .eq('user_id', user.id)
++    .gte('date', addDays(today, -SYNC_BACK_DAYS))
++    .lte('date', addDays(today, SYNC_FORWARD_DAYS));
++  if (error) throw error;
++  await applyRemoteRows(data || []);
++}
++
++export async function syncNow() {
++  if (!supabaseConfigured || !host) return;
++  try {
++    await flush();
++    await pull();
++    await queueChanges(host.getState());
++    await flush();
++    setStatus({ lastSync: new Date().toISOString(), error: null });
++  } catch (e) {
++    setStatus({ error: e });
++  }
++}
++
++function subscribe(user) {
++  unsubscribe();
++  channel = supabase
++    .channel(`panmatz-${user.id}`)
++    .on(
++      'postgres_changes',
++      { event: '*', schema: 'public', table: TABLE, filter: `user_id=eq.${user.id}` },
++      (payload) => {
++        applyRemoteRows([payload.new]).catch(() => {});
++      }
++    )
++    .subscribe((s) => {
++      if (s === 'SUBSCRIBED') syncNow(); // חיבור או חיבור מחדש — משלימים פערים
++    });
++}
++
++function unsubscribe() {
++  if (channel) {
++    supabase.removeChannel(channel);
++    channel = null;
++  }
++}
++
++// ---------------------------------------------------------------------------
++//  חיבור לאפליקציה (נקרא פעם אחת מ-AppContext)
++// ---------------------------------------------------------------------------
++export function attachSync({ getState, update }) {
++  if (!supabaseConfigured) return () => {};
++  host = { getState, update };
++  const start = (user) => {
++    setStatus({ user });
++    if (user) subscribe(user);
++    else unsubscribe();
++  };
++  currentUser().then(start);
++  const { data } = supabase.auth.onAuthStateChange((event, session) => {
++    if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'INITIAL_SESSION') start(session?.user ?? null);
++  });
++  const appSub = AppState.addEventListener('change', (s) => {
++    if (s === 'active') {
++      supabase.auth.startAutoRefresh();
++      syncNow();
++    } else {
++      supabase.auth.stopAutoRefresh();
++    }
++  });
++  return () => {
++    data.subscription.unsubscribe();
++    appSub.remove();
++    unsubscribe();
++    host = null;
++  };
++}
++
++// ---------------------------------------------------------------------------
++//  התחברות
++// ---------------------------------------------------------------------------
++export async function signIn(email, password) {
++  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
++  if (error) throw error;
++}
++
++export async function signUp(email, password) {
++  const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
++  if (error) throw error;
++  return !!data.session; // false = צריך לאשר אימייל
++}
++
++export async function signOut() {
++  unsubscribe();
++  await supabase.auth.signOut();
++  meta = { pushed: {}, queue: [] };
++  await AsyncStorage.removeItem(META_KEY).catch(() => {});
++  setStatus({ user: null, lastSync: null, error: null });
++}
++
++// ---------------------------------------------------------------------------
++//  גיבוי מלא לענן / שחזור
++// ---------------------------------------------------------------------------
++export async function backupToCloud(state) {
++  const user = await currentUser();
++  if (!user) throw new Error('צריך להתחבר קודם');
++  const updated_at = new Date().toISOString();
++  const { error } = await supabase.from('panmatz_backup').upsert({ user_id: user.id, state, updated_at });
++  if (error) throw error;
++  return updated_at;
++}
++
++export async function lastBackupTime() {
++  const user = await currentUser();
++  if (!user) return null;
++  const { data } = await supabase.from('panmatz_backup').select('updated_at').eq('user_id', user.id).maybeSingle();
++  return data?.updated_at ?? null;
++}
++
++export async function fetchBackup() {
++  const user = await currentUser();
++  if (!user) throw new Error('צריך להתחבר קודם');
++  const { data, error } = await supabase.from('panmatz_backup').select('state, updated_at').eq('user_id', user.id).maybeSingle();
++  if (error) throw error;
++  return data; // null אם אין גיבוי
++}
+diff --git a/src/sync/supabase.js b/src/sync/supabase.js
+new file mode 100644
+index 0000000..7d6e919
+--- /dev/null
++++ b/src/sync/supabase.js
+@@ -0,0 +1,36 @@
++// חיבור ל-Supabase — רק אם הוגדרו מפתחות בקובץ .env.
++// בלי מפתחות (או בלי התחברות) האפליקציה עובדת בדיוק כמו קודם, מקומית בלבד.
++import 'react-native-url-polyfill/auto';
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import { createClient } from '@supabase/supabase-js';
++
++const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
++const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
++
++export const supabaseConfigured = Boolean(url && anonKey && !url.includes('YOUR-PROJECT'));
++
++export const supabase = supabaseConfigured
++  ? createClient(url, anonKey, {
++      auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false },
++    })
++  : null;
++
++export async function currentUser() {
++  if (!supabase) return null;
++  try {
++    const { data } = await supabase.auth.getSession();
++    return data.session?.user ?? null;
++  } catch {
++    return null;
++  }
++}
++
++export function authErrorText(e) {
++  const m = String(e?.message || e || '');
++  if (/Invalid login credentials/i.test(m)) return 'אימייל או סיסמה לא נכונים';
++  if (/Email not confirmed/i.test(m)) return 'צריך לאשר את האימייל (בדוק את תיבת הדואר)';
++  if (/already registered/i.test(m)) return 'המשתמש כבר קיים — לחץ "התחברות"';
++  if (/Password should be/i.test(m)) return 'הסיסמה קצרה מדי (לפחות 6 תווים)';
++  if (/network|fetch/i.test(m)) return 'אין חיבור לאינטרנט';
++  return m || 'שגיאה לא ידועה';
++}
+diff --git a/src/utils/syncRows.js b/src/utils/syncRows.js
+new file mode 100644
+index 0000000..d5ba379
+--- /dev/null
++++ b/src/utils/syncRows.js
+@@ -0,0 +1,89 @@
++// לוגיקה טהורה לסנכרון עם My Day: אילו שורות לשלוח, ואיך להחיל סימון שהגיע מהצד השני.
++// שורה = { date, goal_id, title, target, done, deleted } — אחת לכל יעד בכל יום אימון.
++import { dayKey, keyToDate } from './date';
++import { formatValue, unitLabel } from './fitness';
++
++export const SYNC_BACK_DAYS = 7;
++export const SYNC_FORWARD_DAYS = 7;
++
++export function addDays(key, n) {
++  const d = keyToDate(key);
++  d.setDate(d.getDate() + n);
++  return dayKey(d);
++}
++
++export const rowKey = (r) => `${r.date}|${r.goal_id}`;
++export const signature = (r) => `${r.title}|${r.target}|${r.done ? 1 : 0}|${r.deleted ? 1 : 0}`;
++
++// היעד הנוכחי כטקסט קצר ("5 חז׳", "9:40 דק׳")
++export function goalTarget(goal) {
++  if (goal.tracking !== 'measured') return '';
++  const unit = unitLabel(goal);
++  return `${formatValue(goal, goal.current)}${unit ? ` ${unit}` : ''}`;
++}
++
++// היעדים של יום מסוים — בדיוק כמו "יעדי היום" במסך הבית
++export function rowsForDate(state, dateKey) {
++  const weekday = keyToDate(dateKey).getDay();
++  const log = state.logs?.[dateKey];
++  return (state.goals || [])
++    .filter((g) => g.enabled && g.trainingDays.includes(weekday))
++    .map((g) => ({
++      date: dateKey,
++      goal_id: g.id,
++      title: g.name,
++      target: goalTarget(g),
++      done: !!log?.goals?.[g.id]?.done,
++      deleted: false,
++    }));
++}
++
++export function rowsForRange(state, fromKey, toKey) {
++  const out = {};
++  for (let k = fromKey; k <= toKey; k = addDays(k, 1)) {
++    rowsForDate(state, k).forEach((r) => {
++      out[rowKey(r)] = r;
++    });
++  }
++  return out;
++}
++
++// מה השתנה מאז השליחה האחרונה. יעד שנעלם (כובה / הוסר מהיום) מסומן deleted —
++// רק מהיום והלאה, כדי לא למחוק היסטוריה של ימים שעברו.
++export function diffRows(current, pushed, todayKey, fromKey, toKey) {
++  const out = [];
++  Object.entries(current).forEach(([k, r]) => {
++    if (!pushed[k] || signature(pushed[k]) !== signature(r)) out.push(r);
++  });
++  Object.entries(pushed).forEach(([k, p]) => {
++    if (current[k] || p.deleted) return;
++    if (p.date < todayKey || p.date < fromKey || p.date > toKey) return;
++    out.push({ ...p, deleted: true });
++  });
++  return out;
++}
++
++// הוספה לתור — שינוי חדש לאותו יעד ויום מחליף את הקודם (בלי כפילויות)
++export function enqueue(queue, row) {
++  return [...queue.filter((q) => rowKey(q) !== rowKey(row)), row];
++}
++
++// סימון/ביטול יעד ביום מסוים — כמו סימון ממסך הבית, בלי הודעות וחגיגות
++export function applyDone(state, dateKey, goalId, done) {
++  const goal = state.goals.find((g) => g.id === goalId);
++  if (!goal) return state;
++  const log = state.logs[dateKey] || { trained: false, goals: {} };
++  if (!!log.goals?.[goalId]?.done === !!done) return state;
++  const goalsLog = { ...(log.goals || {}) };
++  if (done) {
++    const value = goal.tracking === 'measured' ? goal.current : null;
++    goalsLog[goalId] = { done: true, value };
++    const goals = goal.tracking === 'measured' && value != null
++      ? state.goals.map((g) => (g.id === goalId ? { ...g, history: [...g.history, { date: dateKey, value }].slice(-120) } : g))
++      : state.goals;
++    return { ...state, goals, logs: { ...state.logs, [dateKey]: { ...log, trained: true, goals: goalsLog } } };
++  }
++  delete goalsLog[goalId];
++  const stillTrained = Object.values(goalsLog).some((v) => v.done);
++  return { ...state, logs: { ...state.logs, [dateKey]: { ...log, trained: stillTrained, goals: goalsLog } } };
++}
+-- 
+2.43.0
+
