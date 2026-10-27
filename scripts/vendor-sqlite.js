@@ -1,6 +1,6 @@
 // מעתיק את קוד המקור של SQLite מהריפו למקום שבו expo-sqlite מחפש אותו בזמן הבנייה.
 // ככה הבנייה ב-EAS לא תלויה בהורדה מ-sqlite.org (שנכשלה פעם ב-"Network is unreachable").
-// expo-sqlite מדלג על ההורדה כשהקובץ כבר קיים (overwrite: false).
+// בנוסף מכבים את onlyIfNewer — אחרת המשימה עדיין פונה לרשת כדי להשוות תאריכים.
 const fs = require('fs');
 const path = require('path');
 
@@ -14,6 +14,13 @@ try {
   fs.mkdirSync(destDir, { recursive: true });
   fs.copyFileSync(src, path.join(destDir, FILE));
   console.log(`vendor-sqlite: copied ${FILE}`);
+
+  const gradle = path.join(pkg, 'build.gradle');
+  const g = fs.readFileSync(gradle, 'utf8');
+  if (g.includes('onlyIfNewer(true)')) {
+    fs.writeFileSync(gradle, g.replace('onlyIfNewer(true)', 'onlyIfNewer(false)\n  onlyIf { !it.dest.exists() }'));
+    console.log('vendor-sqlite: download disabled when file exists');
+  }
 } catch (e) {
   console.warn('vendor-sqlite: skipped', e.message);
 }
