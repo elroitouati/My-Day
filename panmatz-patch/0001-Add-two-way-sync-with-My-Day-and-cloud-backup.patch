@@ -1,4 +1,4 @@
-From bffda2343973148459b240238b23649d4e97b3e0 Mon Sep 17 00:00:00 2001
+From 934dd1f2df1690f89eefe11b915267727c1b9a2a Mon Sep 17 00:00:00 2001
 From: Claude <noreply@anthropic.com>
 Date: Sun, 25 Oct 2026 05:57:47 +0000
 Subject: [PATCH] Add two-way sync with My Day and cloud backup
@@ -18,6 +18,7 @@ Claude-Session: https://claude.ai/code/session_01VhC1jupvmKnQxdFH5KaLW4
  .env.example                  |   5 +
  .gitignore                    |   4 +
  README.md                     |  15 +-
+ eas.json                      |   8 +
  package-lock.json             | 998 +++++++++++++++++++++++++++++++---
  package.json                  |   7 +-
  scripts/test-sync.mjs         |  87 +++
@@ -27,7 +28,7 @@ Claude-Session: https://claude.ai/code/session_01VhC1jupvmKnQxdFH5KaLW4
  src/sync/panmatzSync.js       | 286 ++++++++++
  src/sync/supabase.js          |  36 ++
  src/utils/syncRows.js         |  89 +++
- 13 files changed, 1681 insertions(+), 67 deletions(-)
+ 14 files changed, 1689 insertions(+), 67 deletions(-)
  create mode 100644 .easignore
  create mode 100644 .env.example
  create mode 100644 scripts/test-sync.mjs
@@ -120,6 +121,31 @@ index f032bbf..27b7818 100644
 -- כל הנתונים מקומיים למכשיר. אין הרשמה/פרופיל/ריבוי משתמשים.
 +- כל הנתונים מקומיים למכשיר. התחברות נדרשת רק לסנכרון עם My Day ולגיבוי לענן.
  - תאריכי השלבים מוזנים ידנית במסך ההגדרות כשהם נודעים; עד אז מסך הבית מציג חודש משוער בלבד.
+diff --git a/eas.json b/eas.json
+index 7f7a252..add6359 100644
+--- a/eas.json
++++ b/eas.json
+@@ -8,12 +8,20 @@
+       "distribution": "internal",
+       "android": {
+         "buildType": "apk"
++      },
++      "env": {
++        "EXPO_PUBLIC_SUPABASE_URL": "https://iqekfoywkywyhlpgmhwy.supabase.co",
++        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxZWtmb3l3a3l3eWhscGdtaHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTEyMDAsImV4cCI6MjEwODY4NzIwMH0.YjeKjpFqfXVv1dtjSaPZhp3ePB03uIx5LPNSCguBy4c"
+       }
+     },
+     "production": {
+       "autoIncrement": true,
+       "android": {
+         "buildType": "app-bundle"
++      },
++      "env": {
++        "EXPO_PUBLIC_SUPABASE_URL": "https://iqekfoywkywyhlpgmhwy.supabase.co",
++        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxZWtmb3l3a3l3eWhscGdtaHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTEyMDAsImV4cCI6MjEwODY4NzIwMH0.YjeKjpFqfXVv1dtjSaPZhp3ePB03uIx5LPNSCguBy4c"
+       }
+     }
+   },
 diff --git a/package-lock.json b/package-lock.json
 index f0e35b5..40294ad 100644
 --- a/package-lock.json
