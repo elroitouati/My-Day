@@ -61,7 +61,7 @@ export default function MonthScreen({ navigation }) {
               const dots = [...new Set(items.map((i) => i.color))].slice(0, 4);
               const isToday = k === today;
               const all = p.total > 0 && p.done === p.total;
-              const missed = k < today && p.done < p.total;
+              const missed = items.some((i) => i.missed); // רק פנמ"צ
               return (
                 <Pressable
                   key={k}
@@ -93,7 +93,7 @@ export default function MonthScreen({ navigation }) {
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendSwatch, styles.legendMissed]} />
-          <Text style={styles.legendText}>יש פספוס</Text>
+          <Text style={styles.legendText}>פספוס אימון פנמ"צ</Text>
         </View>
       </View>
     </Screen>

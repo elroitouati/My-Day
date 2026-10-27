@@ -25,9 +25,12 @@ test('merges all sources, all-day first then by time', () => {
   expect(progress(items)).toEqual({ total: 5, done: 2, ratio: 0.4 });
 });
 
-test('unchecked items in past days are missed, and stay on their own day', () => {
-  const byDate = buildRangeItems('2026-10-23', '2026-10-25', base(), '2026-10-25');
-  expect(byDate['2026-10-23'][0]).toMatchObject({ title: 'מים', missed: true });
+test('past unchecked tasks are only "unmarked"; missed is for Panmatz alone', () => {
+  const data = base();
+  data.panmatz.push({ date: '2026-10-23', goal_id: 'run', title: 'ריצה', done: 0 });
+  const byDate = buildRangeItems('2026-10-23', '2026-10-25', data, '2026-10-25');
+  expect(byDate['2026-10-23'].find((i) => i.title === 'מים')).toMatchObject({ missed: false, unmarked: true });
+  expect(byDate['2026-10-23'].find((i) => i.title === 'ריצה')).toMatchObject({ missed: true, unmarked: false });
   expect(byDate['2026-10-24'][0]).toMatchObject({ title: 'מים', missed: false, done: true });
   expect(byDate['2026-10-25'].every((i) => !i.missed)).toBe(true);
   expect(byDate['2026-10-25'].filter((i) => i.title === 'מים')).toHaveLength(1);

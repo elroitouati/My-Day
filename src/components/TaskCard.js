@@ -43,6 +43,11 @@ export default function TaskCard({ item, index = 0, onToggle, onPress, onLongPre
               <Ionicons name="alert-circle" size={13} color={colors.missed} />
               <Text style={styles.missedText}>פספוס</Text>
             </View>
+          ) : item.unmarked ? (
+            <View style={styles.missedPill}>
+              <Ionicons name="ellipse-outline" size={12} color={colors.ink3} />
+              <Text style={styles.unmarkedText}>לא סומן</Text>
+            </View>
           ) : null}
         </View>
         <View style={[styles.checkWrap, { backgroundColor: item.done ? tint(item.color, 0.1) : 'transparent' }]}>
@@ -85,5 +90,6 @@ const makeStyles = () => StyleSheet.create({
   sub: { ...text.caption, textAlign: 'left' },
   missedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, alignSelf: 'flex-start' },
   missedText: { ...text.caption, color: colors.missed, fontFamily: font.bold },
+  unmarkedText: { ...text.caption },
   checkWrap: { borderRadius: radius.pill, padding: 4, marginStart: space[2] },
 });

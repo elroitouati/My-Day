@@ -114,7 +114,7 @@ export default function WeekScreen({ navigation }) {
             const p = progress(items);
             const isToday = k === today;
             const all = p.total > 0 && p.done === p.total;
-            const missed = k < today && p.done < p.total;
+            const missed = items.some((i) => i.missed); // רק פנמ"צ
             return (
               <Pressable key={k} style={styles.dayHead} onPress={() => openDay(k)} accessibilityLabel={`פתיחת יום ${k}`}>
                 <Text style={[styles.dayLetter, isToday && styles.brandText]}>{HEB_WEEKDAYS_LETTER[keyToDate(k).getDay()]}</Text>

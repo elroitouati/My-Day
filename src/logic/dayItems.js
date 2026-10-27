@@ -86,7 +86,9 @@ export function buildRangeItems(startKey, endKey, data, today) {
   for (const date of Object.keys(byDate)) {
     byDate[date] = sortItems(byDate[date]).map((it) => ({
       ...it,
-      missed: !!today && date < today && !it.done,
+      // "פספוס" (אדום) רק לאימוני פנמ"צ. משימה רגילה שלא סומנה — רק "לא סומן", בלי שיפוט
+      missed: !!today && date < today && !it.done && it.source === 'panmatz',
+      unmarked: !!today && date < today && !it.done && it.source !== 'panmatz',
     }));
   }
   return byDate;
