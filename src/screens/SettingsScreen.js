@@ -1,6 +1,8 @@
 // הגדרות: קטגוריות, התראות, יומנים, סנכרון פנמ"צ וווידג'ט.
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Linking, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Linking, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import Screen from '../components/Screen';
 import { Group, Row, Toggle, Chips, Button, Field } from '../components/controls';
@@ -17,9 +19,11 @@ import { supabaseConfigured, signIn, signUp, signOut, authErrorText } from '../s
 import { syncPanmatz, getLastSyncError } from '../services/panmatzSync';
 import { clearPanmatz } from '../db/repo';
 import { PANMATZ_CATEGORY, UNCATEGORIZED } from '../logic/dayItems';
-import { colors, space, text, font } from '../design/tokens';
+import { colors, space, text, font, ACCENTS, TAB_STYLES } from '../design/tokens';
+import { useStyles, useTheme } from '../state/Theme';
 
 export default function SettingsScreen() {
+  const styles = useStyles(makeStyles);
   const { categories, settings, updateSetting } = useAppState();
   const [editCat, setEditCat] = useState(null);
   const [notifPerm, setNotifPerm] = useState(null);
@@ -74,6 +78,8 @@ export default function SettingsScreen() {
 
   return (
     <Screen eyebrow="My Day" title="הגדרות">
+      <AppearanceSection />
+
       <Group title="קטגוריות">
         {categories.map((c) => (
           <Row key={c.id} icon="pricetag" iconColor={c.color || UNCATEGORIZED.color} title={c.name} chevron onPress={() => setEditCat(c)} />
@@ -126,7 +132,72 @@ export default function SettingsScreen() {
   );
 }
 
+// מראה: בהיר/כהה, צבע מותג וסגנון סרגל הטאבים. הגופנים והמבנה לא משתנים.
+function AppearanceSection() {
+  const styles = useStyles(makeStyles);
+  const { mode, accent, tabStyle, setTheme } = useTheme();
+  const change = (patch) => {
+    Haptics.selectionAsync().catch(() => {});
+    setTheme(patch);
+    setTimeout(() => refreshWidget(), 300); // גם הווידג'ט מתעדכן לערכה החדשה
+  };
+  return (
+    <View style={styles.inlineBlock}>
+      <Text style={styles.inlineLabel}>מראה</Text>
+      <View style={styles.appearance}>
+        <View style={styles.modeRow}>
+          {[
+            { id: 'light', label: 'בהיר', icon: 'sunny' },
+            { id: 'dark', label: 'כהה', icon: 'moon' },
+          ].map((m) => {
+            const on = mode === m.id;
+            return (
+              <Pressable
+                key={m.id}
+                onPress={() => change({ mode: m.id })}
+                style={[styles.modeBtn, on && styles.modeBtnOn]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+              >
+                <Ionicons name={m.icon} size={18} color={on ? colors.onBrand : colors.ink2} />
+                <Text style={[styles.modeText, on && styles.modeTextOn]}>{m.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.subLabel}>צבע האפליקציה</Text>
+        <View style={styles.accents}>
+          {ACCENTS.map((a) => {
+            const on = accent === a.id;
+            const c = mode === 'dark' ? a.brandDark : a.brand;
+            return (
+              <Pressable
+                key={a.id}
+                onPress={() => change({ accent: a.id })}
+                style={styles.accentItem}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={a.name}
+              >
+                <View style={[styles.accentDot, { backgroundColor: c }, on && { borderColor: colors.ink }]}>
+                  {on ? <Ionicons name="checkmark" size={20} color="#FFFFFF" /> : null}
+                </View>
+                <Text style={[styles.accentName, on && styles.accentNameOn]}>{a.name}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.subLabel}>סרגל הכפתורים למטה</Text>
+        <Chips options={TAB_STYLES.map((t) => ({ value: t.id, label: t.name }))} value={tabStyle} onChange={(v) => change({ tabStyle: v })} />
+      </View>
+    </View>
+  );
+}
+
 function PanmatzSection() {
+  const styles = useStyles(makeStyles);
   const { user } = useAppState();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -213,8 +284,20 @@ function PanmatzSection() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   inlineBlock: { gap: space[2] },
+  appearance: { backgroundColor: colors.card, borderRadius: 24, padding: space[4], gap: space[3] },
+  modeRow: { flexDirection: 'row', gap: space[2], backgroundColor: colors.sunken, borderRadius: 16, padding: 4 },
+  modeBtn: { flex: 1, height: 42, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  modeBtnOn: { backgroundColor: colors.brand },
+  modeText: { fontFamily: font.bold, fontSize: 15, color: colors.ink2 },
+  modeTextOn: { color: colors.onBrand },
+  subLabel: { ...text.caption, fontFamily: font.bold, color: colors.ink2, textAlign: 'left', marginTop: space[1] },
+  accents: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
+  accentItem: { alignItems: 'center', gap: 4, minWidth: 48 },
+  accentDot: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'transparent' },
+  accentName: { ...text.caption },
+  accentNameOn: { color: colors.ink, fontFamily: font.bold },
   inlineLabel: { ...text.caption, fontFamily: font.bold, color: colors.ink2, paddingHorizontal: space[2], textAlign: 'left' },
   authCard: { backgroundColor: colors.sunken, borderRadius: 24, padding: space[4], gap: space[3] },
   authHint: { ...text.sub, textAlign: 'left' },

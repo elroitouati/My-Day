@@ -13,11 +13,13 @@ import Animated, {
 import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { colors } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const CHECK_LEN = 20;
 
 export default function CheckCircle({ done: savedDone, color, missed, onToggle, size = 36, label }) {
+  const styles = useStyles(makeStyles);
   // מצב אופטימי: הסימון מגיב מיד, ומתיישר עם הנתונים כשהם מתעדכנים
   const [done, setDone] = useState(savedDone);
   useEffect(() => setDone(savedDone), [savedDone]);
@@ -78,7 +80,7 @@ export default function CheckCircle({ done: savedDone, color, missed, onToggle, 
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   ring: {
     borderWidth: 2.5,
     alignItems: 'center',

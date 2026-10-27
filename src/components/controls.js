@@ -5,11 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, radius, shadow, space, text, font } from '../design/tokens';
 import { HEB_WEEKDAYS_LETTER } from '../logic/dates';
+import { useStyles } from '../state/Theme';
 
 const tap = () => Haptics.selectionAsync().catch(() => {});
 
 export function Button({ title, onPress, kind = 'primary', icon, disabled, style }) {
-  const k = BTN[kind];
+  const styles = useStyles(makeStyles);
+  const k = BTN()[kind];
   return (
     <Pressable
       onPress={onPress}
@@ -22,18 +24,20 @@ export function Button({ title, onPress, kind = 'primary', icon, disabled, style
     </Pressable>
   );
 }
-const BTN = {
+const BTN = () => ({
   primary: { box: { backgroundColor: colors.brand, ...shadow.float, shadowOpacity: 0.2 }, text: { color: colors.onBrand } },
   soft: { box: { backgroundColor: colors.brandSoft }, text: { color: colors.brand } },
   danger: { box: { backgroundColor: colors.missedSoft }, text: { color: colors.missed } },
   ghost: { box: { backgroundColor: 'transparent' }, text: { color: colors.ink2 } },
-};
+});
 
 export function Label({ children }) {
+  const styles = useStyles(makeStyles);
   return <Text style={styles.label}>{children}</Text>;
 }
 
 export function Field({ value, onChangeText, placeholder, multiline, autoFocus, ...rest }) {
+  const styles = useStyles(makeStyles);
   return (
     <TextInput
       value={value}
@@ -49,6 +53,7 @@ export function Field({ value, onChangeText, placeholder, multiline, autoFocus, 
 }
 
 export function Chips({ options, value, onChange, colorFor }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.chips}>
       {options.map((o) => {
@@ -76,6 +81,7 @@ export function Chips({ options, value, onChange, colorFor }) {
 }
 
 export function DayToggles({ value, onChange }) {
+  const styles = useStyles(makeStyles);
   return (
     <View style={styles.days}>
       {HEB_WEEKDAYS_LETTER.map((l, d) => {
@@ -100,6 +106,7 @@ export function DayToggles({ value, onChange }) {
 }
 
 export function Stepper({ value, onChange, min = 1, max = 365, suffix }) {
+  const styles = useStyles(makeStyles);
   const set = (v) => {
     tap();
     onChange(Math.max(min, Math.min(max, v)));
@@ -122,6 +129,7 @@ export function Stepper({ value, onChange, min = 1, max = 365, suffix }) {
 
 // שורה בתוך קבוצה (הגדרות / שדות תאריך ושעה)
 export function Row({ icon, iconColor, title, subtitle, value, onPress, trailing, chevron, danger }) {
+  const styles = useStyles(makeStyles);
   const content = (
     <>
       {icon ? (
@@ -147,6 +155,7 @@ export function Row({ icon, iconColor, title, subtitle, value, onPress, trailing
 }
 
 export function Group({ title, footer, children }) {
+  const styles = useStyles(makeStyles);
   const items = React.Children.toArray(children).filter(Boolean);
   return (
     <View style={styles.groupWrap}>
@@ -178,7 +187,7 @@ export function Toggle({ value, onValueChange }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   btn: {
     height: 54,
     borderRadius: radius.md,

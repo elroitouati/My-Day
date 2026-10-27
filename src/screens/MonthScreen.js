@@ -8,8 +8,10 @@ import { useAppState, useRange } from '../state/AppState';
 import { buildMonthGrid, monthLabel, keyToDate, HEB_WEEKDAYS_LETTER, dayKey } from '../logic/dates';
 import { progress } from '../logic/dayItems';
 import { colors, radius, shadow, space, text, font } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 export default function MonthScreen({ navigation }) {
+  const styles = useStyles(makeStyles);
   const { today } = useAppState();
   const t = keyToDate(today);
   const [ym, setYm] = useState({ y: t.getFullYear(), m: t.getMonth() });
@@ -97,7 +99,7 @@ export default function MonthScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   nav: { flexDirection: 'row', gap: 6 },
   navBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...shadow.card },
   todayBtn: { width: undefined, paddingHorizontal: 12 },
@@ -109,7 +111,7 @@ const styles = StyleSheet.create({
   cellPressed: { backgroundColor: colors.sunken },
   num: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   numToday: { backgroundColor: colors.brand },
-  numAll: { backgroundColor: '#E3F8EE' },
+  numAll: { backgroundColor: colors.successSoft },
   numText: { fontFamily: font.bold, fontSize: 15, color: colors.ink },
   numTextToday: { color: '#FFFFFF' },
   numTextAll: { color: colors.success },

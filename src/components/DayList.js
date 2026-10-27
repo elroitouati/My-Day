@@ -7,8 +7,10 @@ import EmptyState from './EmptyState';
 import { setItemDone } from '../services/actions';
 import { useAppState } from '../state/AppState';
 import { colors, space, text, font } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 export default function DayList({ items, emptyTitle, emptySubtitle }) {
+  const styles = useStyles(makeStyles);
   const { openTaskSheet } = useAppState();
   if (!items.length) return <EmptyState title={emptyTitle} subtitle={emptySubtitle} />;
   const allDay = items.filter((i) => !i.startTime);
@@ -46,7 +48,7 @@ export default function DayList({ items, emptyTitle, emptySubtitle }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   section: {
     ...text.caption,
     fontFamily: font.bold,

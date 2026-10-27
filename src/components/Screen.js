@@ -6,6 +6,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, space, text } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 export function useFocusKey() {
   const [k, setK] = useState(0);
@@ -14,6 +15,7 @@ export function useFocusKey() {
 }
 
 export default function Screen({ title, eyebrow, subtitle, onBack, action, children, scroll = true, onRefresh, bottomPad = 120 }) {
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const focusKey = useFocusKey();
   const [refreshing, setRefreshing] = useState(false);
@@ -71,7 +73,7 @@ export default function Screen({ title, eyebrow, subtitle, onBack, action, child
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: space[4], gap: space[3] },
   contentNoScroll: { paddingHorizontal: space[4], gap: space[3] },

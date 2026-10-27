@@ -8,6 +8,7 @@ import { saveCategory, deleteCategory } from '../db/repo';
 import { afterChange } from '../services/actions';
 import { PALETTE, space, text } from '../design/tokens';
 import { UNCATEGORIZED } from '../logic/dayItems';
+import { useStyles } from '../state/Theme';
 
 export default function CategorySheet({ category, onClose }) {
   return (
@@ -18,6 +19,7 @@ export default function CategorySheet({ category, onClose }) {
 }
 
 function Form({ category, onClose }) {
+  const styles = useStyles(makeStyles);
   const [name, setName] = useState(category.name || '');
   const [color, setColor] = useState(category.id ? category.color || null : PALETTE[0]);
   const save = async () => {
@@ -55,7 +57,7 @@ function Form({ category, onClose }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   form: { gap: space[4] },
   heading: { ...text.title, textAlign: 'left' },
   preview: { flexDirection: 'row', alignItems: 'center', gap: space[2] },

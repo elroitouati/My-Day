@@ -8,6 +8,7 @@ import Fab from '../components/Fab';
 import { useAppState, useRange } from '../state/AppState';
 import { progress } from '../logic/dayItems';
 import { formatDayTitle, formatHebDate, diffDays } from '../logic/dates';
+import { useStyles } from '../state/Theme';
 
 function relative(today, key) {
   const n = diffDays(today, key);
@@ -18,6 +19,7 @@ function relative(today, key) {
 }
 
 export default function DayScreen({ route, navigation }) {
+  const styles = useStyles(makeStyles);
   const { date } = route.params;
   const { today, openTaskSheet } = useAppState();
   const { byDate, loaded } = useRange(date, date);
@@ -46,4 +48,4 @@ export default function DayScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 } });
+const makeStyles = () => StyleSheet.create({ root: { flex: 1 } });

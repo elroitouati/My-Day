@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { I18nManager, StyleSheet, View, Linking } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as NavigationBar from 'expo-navigation-bar';
+import * as SystemUI from 'expo-system-ui';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,6 +23,7 @@ import { registerBackgroundTask } from './src/services/background';
 import { setupNotifications, requestNotificationPermission, rescheduleNotifications } from './src/services/notifications';
 import { getSettings, setSetting } from './src/db/repo';
 import { colors } from './src/design/tokens';
+import { ThemeProvider, useStyles, useTheme, themeFromSettings } from './src/state/Theme';
 
 // RTL מלא בכל מסך. תוסף ה-config (plugins/withForceRTL) מפעיל אותו כבר בהפעלה הראשונה.
 I18nManager.allowRTL(true);
@@ -30,10 +33,11 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
-const navTheme = {
+const navThemeFor = () => ({
   ...DefaultTheme,
+  dark: colors.mode === 'dark',
   colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.card, primary: colors.brand, text: colors.ink, border: colors.line },
-};
+});
 
 function Tabs() {
   return (
@@ -63,13 +67,16 @@ function DeepLinks() {
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({ Heebo_400Regular, Heebo_500Medium, Heebo_700Bold, Heebo_800ExtraBold });
+  const [theme, setTheme] = useState(null);
 
   useEffect(() => {
     (async () => {
+      // הערכה השמורה נטענת לפני הרינדור הראשון, כדי שלא יהבהב מסך בהיר במצב כהה
+      const s = await getSettings().catch(() => ({}));
+      setTheme(themeFromSettings(s));
       await setupNotifications().catch(() => {});
       registerBackgroundTask();
       // בפתיחה הראשונה בלבד — בקשת הרשאת התראות (אנדרואיד 13+)
-      const s = await getSettings();
       if (!s.askedNotifications) {
         await setSetting('askedNotifications', true);
         if (await requestNotificationPermission().catch(() => false)) rescheduleNotifications();
@@ -78,15 +85,33 @@ export default function App() {
   }, []);
 
   const onReady = useCallback(() => {
-    if (fontsLoaded || fontError) SplashScreen.hideAsync().catch(() => {});
-  }, [fontsLoaded, fontError]);
+    if ((fontsLoaded || fontError) && theme) SplashScreen.hideAsync().catch(() => {});
+  }, [fontsLoaded, fontError, theme]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if ((!fontsLoaded && !fontError) || !theme) return null;
 
+  return (
+    <ThemeProvider initial={theme}>
+      <Root onReady={onReady} />
+    </ThemeProvider>
+  );
+}
+
+function Root({ onReady }) {
+  const styles = useStyles(makeStyles);
+  const { version, mode } = useTheme();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const navTheme = useMemo(navThemeFor, [version]);
+  // סרגל הניווט של אנדרואיד (|||  ○  <) ורקע המערכת — באותו צבע כמו הערכה
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.bg).catch(() => {});
+    NavigationBar.setBackgroundColorAsync(colors.card).catch(() => {});
+    NavigationBar.setButtonStyleAsync(mode === 'dark' ? 'light' : 'dark').catch(() => {});
+  }, [version, mode]);
   return (
     <GestureHandlerRootView style={styles.root} onLayout={onReady}>
       <SafeAreaProvider>
-        <StatusBar style="dark" />
+        <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
         <AppStateProvider>
           <View style={styles.root}>
             <NavigationContainer theme={navTheme}>
@@ -104,6 +129,6 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
 });

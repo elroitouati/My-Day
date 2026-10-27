@@ -6,6 +6,7 @@ import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { PALETTE, colors, radius, space, text, font } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
@@ -39,6 +40,7 @@ export function hexToHsv(hex) {
 const HUES = [0, 60, 120, 180, 240, 300, 360];
 
 export default function ColorPicker({ value, onChange, allowNone = true }) {
+  const styles = useStyles(makeStyles);
   const [hsv, setHsv] = useState(() => (value ? hexToHsv(value) : { h: 250, s: 0.65, v: 1 }));
   const [box, setBox] = useState({ w: 1, h: 1 });
   const [bar, setBar] = useState(1);
@@ -137,7 +139,7 @@ export default function ColorPicker({ value, onChange, allowNone = true }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   wrap: { gap: space[3] },
   ltr: { direction: 'ltr', gap: space[3] },
   box: { height: 160, borderRadius: radius.md, overflow: 'hidden' },

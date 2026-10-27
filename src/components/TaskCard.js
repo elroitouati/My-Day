@@ -6,10 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import CheckCircle from './CheckCircle';
 import { colors, radius, shadow, space, text, tint } from '../design/tokens';
 import { formatTimeRange } from '../logic/dates';
+import { useStyles } from '../state/Theme';
 
 const SOURCE_ICON = { calendar: 'calendar-outline', panmatz: 'barbell-outline' };
 
 export default function TaskCard({ item, index = 0, onToggle, onPress }) {
+  const styles = useStyles(makeStyles);
   const missed = item.missed;
   const meta = [formatTimeRange(item.startTime, item.endTime), item.categoryName].filter(Boolean).join(' · ');
   return (
@@ -55,7 +57,7 @@ export default function TaskCard({ item, index = 0, onToggle, onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',

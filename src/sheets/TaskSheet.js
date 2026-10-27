@@ -16,6 +16,7 @@ import { parseRule, validateRule } from '../logic/recurrence';
 import { newId } from '../logic/editing';
 import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey } from '../logic/dates';
 import { PALETTE, colors, space, text, font } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 const REPEAT = [
   { value: 'once', label: 'חד-פעמית' },
@@ -117,6 +118,7 @@ export default function TaskSheet() {
 const NEW_CATEGORY = '__new';
 
 function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
+  const styles = useStyles(makeStyles);
   const { task, date } = sheet;
   const [d, setD] = useState(() => initialDraft(task, date, settings, categories));
   const [error, setError] = useState(null);
@@ -306,7 +308,7 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   form: { gap: space[4] },
   block: { gap: space[4] },
   newCat: { gap: space[3], backgroundColor: colors.sunken, borderRadius: 24, padding: space[4] },

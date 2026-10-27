@@ -5,17 +5,23 @@ import React from 'react';
 import { FlexWidget, TextWidget, ListWidget, SvgWidget } from 'react-native-android-widget';
 import { formatDayTitle, formatHebDate, formatTimeRange } from '../logic/dates';
 import { progress } from '../logic/dayItems';
+import { buildPalette } from '../design/tokens';
 
-const C = {
-  bg: '#FFFFFF',
-  ink: '#15172B',
-  ink2: '#5B6078',
-  ink3: '#9A9FB5',
-  brand: '#6C5CFF',
-  brandSoft: '#EEEBFF',
-  track: '#EEF0F6',
-  line: '#F0F1F6',
-};
+// צבעי הווידג'ט נבנים מהערכה הפעילה (ראו widgetColors)
+function widgetColors(p) {
+  const dark = p.mode === 'dark';
+  return {
+    bg: p.card,
+    ink: p.ink,
+    ink2: p.ink2,
+    ink3: p.ink3,
+    brand: p.brand,
+    brandSoft: p.brandSoft,
+    track: p.sunken,
+    line: dark ? p.line : '#F0F1F6',
+  };
+}
+let C = widgetColors(buildPalette());
 const F = { regular: 'Heebo-Regular', medium: 'Heebo-Medium', bold: 'Heebo-Bold', heavy: 'Heebo-ExtraBold' };
 
 const checkSvg = (color) =>
@@ -105,7 +111,8 @@ function ProgressBar({ ratio }) {
   );
 }
 
-export function MyDayWidget({ today, items, width = 320, height = 240 }) {
+export function MyDayWidget({ today, items, palette, width = 320, height = 240 }) {
+  C = widgetColors(palette || buildPalette());
   const p = progress(items);
   const compact = width < 260 || height < 200;
   return (

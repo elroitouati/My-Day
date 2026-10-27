@@ -5,8 +5,10 @@ import Animated, { ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, shadow } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 export default function Fab({ onPress, bottom }) {
+  const styles = useStyles(makeStyles);
   return (
     <Animated.View entering={ZoomIn.springify().damping(14)} style={[styles.wrap, { bottom }]}>
       <Pressable
@@ -24,7 +26,7 @@ export default function Fab({ onPress, bottom }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   wrap: { position: 'absolute', end: 20 },
   fab: {
     width: 62,

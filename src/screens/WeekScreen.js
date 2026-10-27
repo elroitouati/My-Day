@@ -10,6 +10,7 @@ import { useFocusKey } from '../components/Screen';
 import { addDays, startOfWeek, rangeKeys, keyToDate, HEB_WEEKDAYS_LETTER, HEB_MONTHS, timeToMinutes } from '../logic/dates';
 import { progress } from '../logic/dayItems';
 import { colors, radius, shadow, space, text, font, tint } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 const HOUR = 52;
 const HOURS_COL = 34;
@@ -56,6 +57,7 @@ function layoutBlocks(items) {
 }
 
 export default function WeekScreen({ navigation }) {
+  const styles = useStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const focusKey = useFocusKey();
   const { today, openTaskSheet } = useAppState();
@@ -190,7 +192,7 @@ export default function WeekScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: space[4], paddingTop: space[4], paddingBottom: space[3], gap: space[3] },
   headerTexts: { flex: 1 },
@@ -216,7 +218,7 @@ const styles = StyleSheet.create({
   dayNumText: { fontFamily: font.bold, fontSize: 15, color: colors.ink },
   dayNumTextToday: { color: '#FFFFFF' },
   count: { paddingHorizontal: 6, height: 18, borderRadius: 9, backgroundColor: colors.brandSoft, justifyContent: 'center' },
-  countAll: { backgroundColor: '#E3F8EE' },
+  countAll: { backgroundColor: colors.successSoft },
   countMissed: { backgroundColor: colors.missedSoft },
   countEmpty: { backgroundColor: 'transparent' },
   countText: { fontFamily: font.bold, fontSize: 11, color: colors.brand },

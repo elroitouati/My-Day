@@ -2,14 +2,17 @@ import React from 'react';
 import { Platform } from 'react-native';
 import { requestWidgetUpdate } from 'react-native-android-widget';
 import { MyDayWidget } from './MyDayWidget';
-import { loadDay } from '../db/repo';
+import { loadDay, getSettings } from '../db/repo';
+import { buildPalette } from '../design/tokens';
 import { todayKey } from '../logic/dates';
 
 export const WIDGET_NAME = 'MyDay';
 
 export async function widgetData() {
   const today = todayKey();
-  return { today, items: await loadDay(today) };
+  const [items, s] = await Promise.all([loadDay(today), getSettings()]);
+  // הווידג'ט באותה ערכה כמו האפליקציה (בהיר/כהה + צבע)
+  return { today, items, palette: buildPalette(s.theme_mode || 'light', s.theme_accent || 'violet') };
 }
 
 // עדכון כל עותקי הווידג'ט שעל מסך הבית

@@ -5,8 +5,10 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming, run
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, space } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 export default function BottomSheet({ visible, onClose, children, footer, maxHeightRatio = 0.9 }) {
+  const styles = useStyles(makeStyles);
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [mounted, setMounted] = useState(visible);
@@ -70,7 +72,7 @@ export default function BottomSheet({ visible, onClose, children, footer, maxHei
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   flex: { flex: 1 },
   scrim: { backgroundColor: colors.scrim },
   bottom: { flex: 1, justifyContent: 'flex-end' },

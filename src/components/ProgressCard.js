@@ -3,8 +3,10 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { colors, radius, shadow, space, text } from '../design/tokens';
+import { useStyles } from '../state/Theme';
 
 export default function ProgressCard({ done, total }) {
+  const styles = useStyles(makeStyles);
   const ratio = total ? done / total : 0;
   const w = useSharedValue(0);
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function ProgressCard({ done, total }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: radius.card, padding: space[4], gap: space[3], ...shadow.card },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label: { ...text.heading, textAlign: 'left' },
