@@ -10,7 +10,8 @@
     "test": "jest",
     "doctor": "expo-doctor",
     "ios": "expo run:ios",
-    "postinstall": "node scripts/vendor-sqlite.js"
+    "postinstall": "node scripts/vendor-sqlite.js",
+    "eas-build-post-install": "node scripts/vendor-sqlite.js"
   },
   "dependencies": {
     "@expo-google-fonts/amatic-sc": "^0.2.3",
