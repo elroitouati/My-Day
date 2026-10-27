@@ -3,7 +3,7 @@
 
 import { addDays } from './dates';
 
-const TASK_FIELDS = ['title', 'category_id', 'notes', 'start_time', 'end_time', 'reminder'];
+const TASK_FIELDS = ['title', 'category_id', 'color', 'notes', 'start_time', 'end_time', 'reminder'];
 
 export function newId(prefix = 't') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

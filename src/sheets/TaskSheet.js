@@ -1,5 +1,5 @@
 // גיליון הוספה ועריכה של משימה.
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,14 +7,15 @@ import BottomSheet from '../components/BottomSheet';
 import { Button, Chips, DayToggles, Field, Label, Stepper, Group, Row, Toggle } from '../components/controls';
 import { pickDate, pickTime } from '../components/pickers';
 import { useAppState } from '../state/AppState';
-import { createTask, editTask, removeTask, saveCategory } from '../db/repo';
+import { createTask, editTask, removeTask, saveCategory, getTaskHistory, forgetTask } from '../db/repo';
+import { rankSuggestions, highlightParts } from '../logic/suggest';
 import ColorPicker from '../components/ColorPicker';
 import { afterChange } from '../services/actions';
 import { REMINDER_OPTIONS } from '../services/notifications';
 import { parseRule, validateRule } from '../logic/recurrence';
 import { newId } from '../logic/editing';
-import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey } from '../logic/dates';
-import { PALETTE, colors, space, text, font } from '../design/tokens';
+import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey, formatTimeRange } from '../logic/dates';
+import { PALETTE, colors, space, text, font, shadow } from '../design/tokens';
 import { useStyles } from '../state/Theme';
 import { haptic, motion } from '../design/feedback';
 
@@ -32,6 +33,7 @@ function initialDraft(task, date, settings, categories) {
     return {
       title: '',
       category_id: null, // קטגוריה לא חובה
+      color: null, // צבע משלה (null = לפי הקטגוריה)
       notes: '',
       timed: false,
       start_time: '09:00',
@@ -51,6 +53,7 @@ function initialDraft(task, date, settings, categories) {
   return {
     title: task.title,
     category_id: task.category_id,
+    color: task.color || null,
     notes: task.notes || '',
     timed: !!task.start_time,
     start_time: task.start_time || '09:00',
@@ -79,6 +82,7 @@ function toTask(d) {
   return {
     title: d.title.trim(),
     category_id: d.category_id,
+    color: d.color || null,
     notes: d.notes.trim() || null,
     start_time: d.timed ? d.start_time : null,
     end_time: d.timed && d.end_time ? d.end_time : null,
@@ -124,7 +128,30 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
-  const [newCat, setNewCat] = useState(null); // { name, color } כשיוצרים קטגוריה מתוך הגיליון
+  const [newCat, setNewCat] = useState(null);
+  // השלמה אוטומטית: משימות שכבר הקלדת בעבר
+  const [history, setHistory] = useState([]);
+  const [suggestOpen, setSuggestOpen] = useState(!task);
+  const loadHistory = useCallback(() => getTaskHistory().then(setHistory).catch(() => {}), []);
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+  const suggestions = useMemo(() => (task ? [] : rankSuggestions(history, d.title)), [history, d.title, task]);
+  const catColor = d.category_id ? categories.find((c) => c.id === d.category_id)?.color : null;
+  const applySuggestion = (h) => {
+    haptic.tap();
+    const catExists = h.category_id && categories.some((c) => c.id === h.category_id);
+    set({
+      title: h.title,
+      category_id: catExists ? h.category_id : null,
+      color: h.color || null,
+      timed: !!h.start_time,
+      start_time: h.start_time || d.start_time,
+      end_time: h.end_time || '',
+      reminder: h.start_time ? h.reminder ?? null : d.reminder,
+    });
+    setSuggestOpen(false);
+  }; // { name, color } כשיוצרים קטגוריה מתוך הגיליון
   const catOptions = useMemo(
     () => [
       { value: null, label: 'בלי קטגוריה' },
@@ -210,11 +237,50 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
         onChangeText={(v) => {
           set({ title: v });
           setError(null);
+          setSuggestOpen(true);
         }}
         placeholder="מה צריך לעשות?"
         autoFocus={!task}
         returnKeyType="done"
+        onBlur={() => setTimeout(() => setSuggestOpen(false), 150)}
+        onFocus={() => setSuggestOpen(true)}
       />
+      {suggestOpen && suggestions.length ? (
+        <Animated.View entering={motion(FadeIn.duration(150))} style={styles.suggest}>
+          {suggestions.map((h, idx) => {
+            const cat = h.category_id ? categories.find((c) => c.id === h.category_id) : null;
+            const dot = h.color || cat?.color || null;
+            return (
+              <Pressable
+                key={h.title}
+                onPress={() => applySuggestion(h)}
+                onLongPress={() =>
+                  Alert.alert('להסיר מההצעות?', h.title, [
+                    { text: 'ביטול', style: 'cancel' },
+                    { text: 'הסרה', style: 'destructive', onPress: () => forgetTask(h.title).then(loadHistory) },
+                  ])
+                }
+                style={({ pressed }) => [styles.suggestRow, idx > 0 && styles.suggestSep, pressed && styles.suggestPressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`הצעה: ${h.title}`}
+              >
+                <View style={[styles.suggestBar, { backgroundColor: dot || colors.line }]} />
+                <View style={styles.suggestTexts}>
+                  <Text style={styles.suggestTitle} numberOfLines={1}>
+                    {highlightParts(h.title, d.title).map((part, i) => (
+                      <Text key={i} style={part.hit ? styles.suggestHit : null}>{part.text}</Text>
+                    ))}
+                  </Text>
+                  <Text style={styles.suggestMeta} numberOfLines={1}>
+                    {[h.start_time ? formatTimeRange(h.start_time, h.end_time) : 'כל היום', cat?.name].filter(Boolean).join(' · ')}
+                  </Text>
+                </View>
+                <Ionicons name="arrow-undo-outline" size={18} color={colors.ink3} />
+              </Pressable>
+            );
+          })}
+        </Animated.View>
+      ) : null}
 
       <Label>קטגוריה</Label>
       <Chips options={catOptions} value={newCat ? NEW_CATEGORY : d.category_id} onChange={chooseCategory} colorFor={(o) => o.color} />
@@ -225,6 +291,14 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
           <Button title="יצירת הקטגוריה" kind="soft" icon="add" onPress={createCategory} disabled={!newCat.name.trim()} />
         </Animated.View>
       ) : null}
+
+      <Label>צבע המשימה</Label>
+      <Chips
+        options={[{ value: 'cat', label: d.category_id ? 'כמו הקטגוריה' : 'בלי צבע' }, { value: 'own', label: 'צבע משלה' }]}
+        value={d.color ? 'own' : 'cat'}
+        onChange={(v) => set({ color: v === 'own' ? d.color || catColor || PALETTE[5] : null })}
+      />
+      {d.color ? <ColorPicker value={d.color} onChange={(c) => set({ color: c })} allowNone={false} /> : null}
 
       <Label>חזרה</Label>
       <Chips options={REPEAT} value={d.repeat} onChange={(v) => set({ repeat: v })} />
@@ -311,6 +385,15 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
 const makeStyles = () => StyleSheet.create({
   form: { gap: space[4] },
   block: { gap: space[4] },
+  suggest: { backgroundColor: colors.card, borderRadius: 20, marginTop: -space[2], overflow: 'hidden', ...shadow.card },
+  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3] },
+  suggestSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  suggestPressed: { backgroundColor: colors.sunken },
+  suggestBar: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
+  suggestTexts: { flex: 1, minWidth: 0 },
+  suggestTitle: { ...text.body, fontFamily: font.bold, textAlign: 'left' },
+  suggestHit: { color: colors.brand },
+  suggestMeta: { ...text.caption, textAlign: 'left' },
   newCat: { gap: space[3], backgroundColor: colors.sunken, borderRadius: 24, padding: space[4] },
   heading: { ...text.title, textAlign: 'left' },
   inline: { flexDirection: 'row', alignItems: 'center', gap: space[3] },

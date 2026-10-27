@@ -25,14 +25,12 @@
       },
       "permissions": [
         "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR",
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.USE_EXACT_ALARM",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE"
-      ],
-      "blockedPermissions": [
-        "android.permission.WRITE_CALENDAR"
       ]
     },
     "plugins": [
@@ -46,7 +44,7 @@
       [
         "expo-calendar",
         {
-          "calendarPermission": "My Day מציגה את האירועים מהיומן שלך כמשימות שאפשר לסמן."
+          "calendarPermission": "My Day מציגה את האירועים מהיומן שלך כמשימות שאפשר לסמן. האפליקציה רק קוראת מהיומן ולא משנה בו כלום."
         }
       ],
       [

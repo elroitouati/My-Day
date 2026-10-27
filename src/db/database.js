@@ -86,6 +86,22 @@ const MIGRATIONS = [
     uids TEXT NOT NULL
   );
   `,
+  // גרסה 3 — צבע משלה למשימה, והיסטוריית משימות להשלמה אוטומטית בהקלדה
+  `
+  ALTER TABLE tasks ADD COLUMN color TEXT;
+  CREATE TABLE IF NOT EXISTS task_history (
+    title TEXT PRIMARY KEY NOT NULL,
+    category_id TEXT,
+    color TEXT,
+    start_time TEXT,
+    end_time TEXT,
+    reminder INTEGER,
+    uses INTEGER NOT NULL DEFAULT 1,
+    last_used INTEGER
+  );
+  INSERT OR IGNORE INTO task_history (title, category_id, start_time, end_time, reminder, uses, last_used)
+    SELECT title, category_id, start_time, end_time, reminder, 1, updated_at FROM tasks;
+  `,
 ];
 
 let dbPromise = null;

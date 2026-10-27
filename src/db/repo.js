@@ -72,7 +72,7 @@ export async function deleteCategory(id) {
 // ---------------------------------------------------------------------------
 //  משימות
 // ---------------------------------------------------------------------------
-const COLS = ['id', 'title', 'category_id', 'notes', 'start_time', 'end_time', 'kind', 'date', 'rule', 'start_date', 'end_date', 'reminder'];
+const COLS = ['id', 'title', 'category_id', 'color', 'notes', 'start_time', 'end_time', 'kind', 'date', 'rule', 'start_date', 'end_date', 'reminder'];
 
 async function insertTask(db, task) {
   const now = Date.now();
@@ -109,6 +109,33 @@ export async function getTask(id) {
 export async function createTask(task) {
   const db = await getDb();
   await insertTask(db, task);
+  await rememberTask(task);
+}
+
+// ---------------------------------------------------------------------------
+//  היסטוריית משימות — להשלמה אוטומטית בזמן הקלדה
+// ---------------------------------------------------------------------------
+export async function rememberTask(t) {
+  if (!t?.title?.trim()) return;
+  const db = await getDb();
+  await db.runAsync(
+    `INSERT INTO task_history (title, category_id, color, start_time, end_time, reminder, uses, last_used)
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+     ON CONFLICT(title) DO UPDATE SET
+       category_id = excluded.category_id, color = excluded.color, start_time = excluded.start_time,
+       end_time = excluded.end_time, reminder = excluded.reminder, uses = uses + 1, last_used = excluded.last_used`,
+    t.title.trim(), t.category_id ?? null, t.color ?? null, t.start_time ?? null, t.end_time ?? null, t.reminder ?? null, Date.now()
+  );
+}
+
+export async function getTaskHistory() {
+  const db = await getDb();
+  return db.getAllAsync('SELECT * FROM task_history ORDER BY last_used DESC LIMIT 400');
+}
+
+export async function forgetTask(title) {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM task_history WHERE title = ?', title);
 }
 
 async function runPlan(db, plan) {
@@ -141,6 +168,7 @@ async function runPlan(db, plan) {
 export async function editTask(task, occurrenceKey, scope, draft) {
   const db = await getDb();
   await db.withTransactionAsync(() => runPlan(db, planEdit(task, occurrenceKey, scope, draft)));
+  await rememberTask(draft);
 }
 
 export async function removeTask(task, occurrenceKey, scope) {

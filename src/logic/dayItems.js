@@ -34,7 +34,7 @@ export function buildRangeItems(startKey, endKey, data, today) {
         date,
         title: task.title,
         notes: task.notes || '',
-        color: cat.color || UNCATEGORIZED.color,
+        color: task.color || cat.color || UNCATEGORIZED.color, // צבע משלה גובר על צבע הקטגוריה
         categoryName: cat.name,
         startTime: task.start_time || null,
         endTime: task.end_time || null,
