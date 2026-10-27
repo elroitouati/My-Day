@@ -9,8 +9,9 @@ import { useAppState, useRange } from '../state/AppState';
 import { useFocusKey } from '../components/Screen';
 import { addDays, startOfWeek, rangeKeys, keyToDate, HEB_WEEKDAYS_LETTER, HEB_MONTHS, timeToMinutes } from '../logic/dates';
 import { progress } from '../logic/dayItems';
-import { colors, radius, shadow, space, text, font, tint } from '../design/tokens';
+import { colors, radius, shadow, space, text, font, tint, fs } from '../design/tokens';
 import { useStyles } from '../state/Theme';
+import { motion } from '../design/feedback';
 
 const HOUR = 52;
 const HOURS_COL = 34;
@@ -86,7 +87,7 @@ export default function WeekScreen({ navigation }) {
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <Animated.View key={focusKey} entering={FadeIn.duration(220)} style={styles.root}>
+      <Animated.View key={focusKey} entering={motion(FadeIn.duration(220))} style={styles.root}>
         <View style={styles.header}>
           <View style={styles.headerTexts}>
             <Text style={styles.eyebrow}>שבוע</Text>
@@ -201,7 +202,7 @@ const makeStyles = () => StyleSheet.create({
   nav: { flexDirection: 'row', gap: 6 },
   navBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...shadow.card },
   todayBtn: { width: undefined, paddingHorizontal: 12 },
-  todayText: { fontFamily: font.bold, fontSize: 13, color: colors.brand },
+  todayText: { fontFamily: font.bold, fontSize: fs(13), color: colors.brand },
   daysRow: {
     flexDirection: 'row',
     marginHorizontal: space[2],
@@ -215,25 +216,25 @@ const makeStyles = () => StyleSheet.create({
   brandText: { color: colors.brand },
   dayNum: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   dayNumToday: { backgroundColor: colors.brand },
-  dayNumText: { fontFamily: font.bold, fontSize: 15, color: colors.ink },
+  dayNumText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink },
   dayNumTextToday: { color: colors.onBrand },
   count: { paddingHorizontal: 6, height: 18, borderRadius: 9, backgroundColor: colors.brandSoft, justifyContent: 'center' },
   countAll: { backgroundColor: colors.successSoft },
   countMissed: { backgroundColor: colors.missedSoft },
   countEmpty: { backgroundColor: 'transparent' },
-  countText: { fontFamily: font.bold, fontSize: 11, color: colors.brand },
+  countText: { fontFamily: font.bold, fontSize: fs(11), color: colors.brand },
   countTextAll: { color: colors.success },
   countTextMissed: { color: colors.missed },
   allDay: { gap: 2, alignSelf: 'stretch', paddingHorizontal: 5, minHeight: 6 },
   allDayBar: { height: 4, borderRadius: 2 },
   timelineContent: { paddingHorizontal: space[2], paddingTop: space[4], paddingBottom: 140 },
   timeline: { flexDirection: 'row' },
-  hour: { position: 'absolute', end: 6, fontFamily: font.medium, fontSize: 11, color: colors.ink3 },
+  hour: { position: 'absolute', end: 6, fontFamily: font.medium, fontSize: fs(11), color: colors.ink3 },
   col: { flex: 1, borderStartWidth: StyleSheet.hairlineWidth, borderStartColor: colors.line },
   colToday: { backgroundColor: tint(colors.brand, 0.04) },
   hourLine: { position: 'absolute', start: 0, end: 0, height: StyleSheet.hairlineWidth, backgroundColor: colors.line },
   block: { position: 'absolute', borderRadius: 8, borderStartWidth: 3, paddingHorizontal: 3, paddingVertical: 2, overflow: 'hidden' },
   blockMissed: { borderStartColor: colors.missed },
-  blockText: { fontFamily: font.bold, fontSize: 10, lineHeight: 13, color: colors.ink, textAlign: 'left' },
+  blockText: { fontFamily: font.bold, fontSize: fs(10), lineHeight: fs(13), color: colors.ink, textAlign: 'left' },
   blockTextDone: { color: colors.ink3, textDecorationLine: 'line-through' },
 });

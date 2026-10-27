@@ -3,17 +3,17 @@ import React from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { colors, shadow } from '../design/tokens';
 import { useStyles } from '../state/Theme';
+import { haptic, motion } from '../design/feedback';
 
 export default function Fab({ onPress, bottom }) {
   const styles = useStyles(makeStyles);
   return (
-    <Animated.View entering={ZoomIn.springify().damping(14)} style={[styles.wrap, { bottom }]}>
+    <Animated.View entering={motion(ZoomIn.springify().damping(14))} style={[styles.wrap, { bottom }]}>
       <Pressable
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          haptic.light();
           onPress();
         }}
         style={({ pressed }) => [styles.fab, pressed && styles.pressed]}

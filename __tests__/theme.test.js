@@ -19,11 +19,11 @@ test.each(['light', 'dark'])('%s: body text is readable on cards and background'
 });
 
 test('applyTheme updates the live tokens in place', () => {
-  applyTheme('dark', 'orange');
+  applyTheme({ mode: 'dark', accent: 'orange' });
   expect(colors.mode).toBe('dark');
   expect(colors.brand).toBe(ACCENTS.find((a) => a.id === 'orange').brandDark);
   expect(text.body.color).toBe(colors.ink);
-  applyTheme('light', 'violet');
+  applyTheme({});
   expect(colors.bg).toBe('#F5F6FA');
 });
 

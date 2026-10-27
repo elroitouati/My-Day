@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Linking, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import Screen from '../components/Screen';
 import { Group, Row, Toggle, Chips, Button, Field } from '../components/controls';
@@ -20,8 +19,9 @@ import { supabaseConfigured, signIn, signUp, signOut, authErrorText } from '../s
 import { syncPanmatz, getLastSyncError } from '../services/panmatzSync';
 import { clearPanmatz } from '../db/repo';
 import { PANMATZ_CATEGORY, UNCATEGORIZED } from '../logic/dayItems';
-import { colors, space, text, font, ACCENTS, TAB_STYLES } from '../design/tokens';
+import { colors, space, text, font, ACCENTS, TAB_STYLES, FONTS, TEXT_SIZES, DENSITIES, fs } from '../design/tokens';
 import { useStyles, useTheme } from '../state/Theme';
+import { haptic } from '../design/feedback';
 
 export default function SettingsScreen() {
   const styles = useStyles(makeStyles);
@@ -98,7 +98,24 @@ export default function SettingsScreen() {
         {settings.eveningEnabled ? (
           <Row title="שעת תזכורת הערב" value={settings.eveningTime} chevron onPress={() => pickTime(settings.eveningTime, (t) => updateSetting('eveningTime', t))} />
         ) : null}
+        <Row icon="sunny-outline" title="תזכורת בוקר" subtitle="כמה משימות מחכות לך היום" trailing={<Toggle value={!!settings.morningEnabled} onValueChange={(v) => updateSetting('morningEnabled', v)} />} />
+        {settings.morningEnabled ? (
+          <Row title="שעת תזכורת הבוקר" value={settings.morningTime} chevron onPress={() => pickTime(settings.morningTime, (t) => updateSetting('morningTime', t))} />
+        ) : null}
       </Group>
+
+      <Group title="שעות שקט" footer="בשעות השקט לא נשלחות התראות בכלל. שבת: משישי 16:00 עד מוצאי שבת 20:00.">
+        <Row icon="moon" title="שעות שקט" trailing={<Toggle value={!!settings.quietEnabled} onValueChange={(v) => updateSetting('quietEnabled', v)} />} />
+        {settings.quietEnabled ? (
+          <Row title="מ-" value={settings.quietFrom} chevron onPress={() => pickTime(settings.quietFrom, (t) => updateSetting('quietFrom', t))} />
+        ) : null}
+        {settings.quietEnabled ? (
+          <Row title="עד" value={settings.quietTo} chevron onPress={() => pickTime(settings.quietTo, (t) => updateSetting('quietTo', t))} />
+        ) : null}
+        <Row icon="flame-outline" title="בלי התראות בשבת" trailing={<Toggle value={!!settings.quietShabbat} onValueChange={(v) => updateSetting('quietShabbat', v)} />} />
+      </Group>
+
+      <BehaviorSection />
       <View style={styles.inlineBlock}>
         <Text style={styles.inlineLabel}>תזכורת ברירת מחדל למשימה עם שעה</Text>
         <Chips options={REMINDER_OPTIONS} value={settings.defaultReminder} onChange={(v) => updateSetting('defaultReminder', v)} />
@@ -123,8 +140,19 @@ export default function SettingsScreen() {
       <PanmatzSection />
 
       <Group title="ווידג'ט" footer="לחיצה ארוכה על מסך הבית ← ווידג'טים ← My Day. הווידג'ט מתעדכן לבד, וגם בכל פתיחה של האפליקציה.">
+        <Row icon="checkmark-done-outline" title="להציג משימות שהושלמו" trailing={<Toggle value={settings.widget_showDone !== false} onValueChange={(v) => updateSetting('widget_showDone', v)} />} />
+        <Row icon="calendar-outline" title="להציג אירועי יומן" trailing={<Toggle value={settings.widget_showCalendar !== false} onValueChange={(v) => updateSetting('widget_showCalendar', v)} />} />
+        <Row icon="barbell-outline" title='להציג אימוני פנמ"צ' trailing={<Toggle value={settings.widget_showPanmatz !== false} onValueChange={(v) => updateSetting('widget_showPanmatz', v)} />} />
         <Row icon="apps-outline" title="רענון הווידג'ט עכשיו" chevron onPress={() => refreshWidget()} />
       </Group>
+      <View style={styles.inlineBlock}>
+        <Text style={styles.inlineLabel}>שקיפות רקע הווידג'ט</Text>
+        <Chips
+          options={[100, 90, 75, 50, 25].map((v) => ({ value: v, label: v === 100 ? 'אטום' : `${v}%` }))}
+          value={settings.widget_opacity ?? 100}
+          onChange={(v) => updateSetting('widget_opacity', v)}
+        />
+      </View>
 
       <Text style={styles.version}>My Day · גרסה {Constants.expoConfig?.version || '1.0.0'}</Text>
 
@@ -133,10 +161,46 @@ export default function SettingsScreen() {
   );
 }
 
+// התנהגות: סדר המשימות, משימות שבוצעו, מסך פתיחה, אנימציות ורטט
+function BehaviorSection() {
+  const styles = useStyles(makeStyles);
+  const { doneItems, sortMode, startTab, motion: motionOn, haptics, setTheme } = useTheme();
+  return (
+    <View style={styles.inlineBlock}>
+      <Text style={styles.inlineLabel}>הרשימה והתנהגות</Text>
+      <View style={styles.appearance}>
+        <Text style={styles.subLabel}>משימות שבוצעו</Text>
+        <Chips
+          options={[{ value: 'inline', label: 'במקום' }, { value: 'bottom', label: 'בסוף הרשימה' }, { value: 'hide', label: 'להסתיר' }]}
+          value={doneItems}
+          onChange={(v) => setTheme({ doneItems: v })}
+        />
+        <Text style={styles.subLabel}>סדר המשימות</Text>
+        <Chips
+          options={[{ value: 'auto', label: 'אוטומטי לפי שעה' }, { value: 'manual', label: 'ידני (בגרירה)' }]}
+          value={sortMode}
+          onChange={(v) => setTheme({ sortMode: v })}
+        />
+        <Text style={styles.hintText}>בסדר ידני: כפתור "סידור" במסך היום, ואז גוררים. לחיצה ארוכה על משימה מעבירה אותה להיום או למחר.</Text>
+        <Text style={styles.subLabel}>המסך שנפתח</Text>
+        <Chips
+          options={[{ value: 'Today', label: 'היום' }, { value: 'Week', label: 'שבוע' }, { value: 'Month', label: 'חודש' }]}
+          value={startTab}
+          onChange={(v) => setTheme({ startTab: v })}
+        />
+      </View>
+      <Group>
+        <Row icon="sparkles-outline" title="אנימציות" trailing={<Toggle value={motionOn !== false} onValueChange={(v) => setTheme({ motion: v })} />} />
+        <Row icon="phone-portrait-outline" title="רטט" trailing={<Toggle value={haptics !== false} onValueChange={(v) => setTheme({ haptics: v })} />} />
+      </Group>
+    </View>
+  );
+}
+
 // מראה: בהיר/כהה, צבע מותג וסגנון סרגל הטאבים. הגופנים והמבנה לא משתנים.
 function AppearanceSection() {
   const styles = useStyles(makeStyles);
-  const { mode, accent, tabStyle, setTheme } = useTheme();
+  const { mode, accent, tabStyle, font: fontId, textSize, density, setTheme } = useTheme();
   const isCustom = accent.startsWith('#');
   const [customOpen, setCustomOpen] = useState(isCustom);
   const [custom, setCustom] = useState(isCustom ? accent : '#6C5CFF');
@@ -148,9 +212,8 @@ function AppearanceSection() {
     debounce.current = setTimeout(() => change({ accent: hex }), 250);
   };
   const change = (patch) => {
-    Haptics.selectionAsync().catch(() => {});
+    haptic.tap();
     setTheme(patch);
-    setTimeout(() => refreshWidget(), 300); // גם הווידג'ט מתעדכן לערכה החדשה
   };
   return (
     <View style={styles.inlineBlock}>
@@ -218,6 +281,20 @@ function AppearanceSection() {
 
         <Text style={styles.subLabel}>סרגל הכפתורים למטה</Text>
         <Chips options={TAB_STYLES.map((t) => ({ value: t.id, label: t.name }))} value={tabStyle} onChange={(v) => change({ tabStyle: v })} />
+
+        <Text style={styles.subLabel}>גופן</Text>
+        <Chips
+          options={FONTS.map((f) => ({ value: f.id, label: f.name, family: f.bold }))}
+          value={fontId}
+          onChange={(v) => change({ font: v })}
+          fontFor={(o) => o.family}
+        />
+
+        <Text style={styles.subLabel}>גודל טקסט</Text>
+        <Chips options={TEXT_SIZES.map((t) => ({ value: t.id, label: t.name }))} value={textSize} onChange={(v) => change({ textSize: v })} />
+
+        <Text style={styles.subLabel}>צפיפות הרשימה</Text>
+        <Chips options={DENSITIES.map((t) => ({ value: t.id, label: t.name }))} value={density} onChange={(v) => change({ density: v })} />
       </View>
     </View>
   );
@@ -313,11 +390,12 @@ function PanmatzSection() {
 
 const makeStyles = () => StyleSheet.create({
   inlineBlock: { gap: space[2] },
+  hintText: { ...text.caption, textAlign: 'left' },
   appearance: { backgroundColor: colors.card, borderRadius: 24, padding: space[4], gap: space[3] },
   modeRow: { flexDirection: 'row', gap: space[2], backgroundColor: colors.sunken, borderRadius: 16, padding: 4 },
   modeBtn: { flex: 1, height: 42, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   modeBtnOn: { backgroundColor: colors.brand },
-  modeText: { fontFamily: font.bold, fontSize: 15, color: colors.ink2 },
+  modeText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink2 },
   modeTextOn: { color: colors.onBrand },
   subLabel: { ...text.caption, fontFamily: font.bold, color: colors.ink2, textAlign: 'left', marginTop: space[1] },
   accents: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },

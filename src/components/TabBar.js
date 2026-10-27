@@ -5,11 +5,11 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle, withSpring, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import Fab from './Fab';
 import { useAppState } from '../state/AppState';
-import { colors, shadow, font } from '../design/tokens';
+import { colors, shadow, font, fs } from '../design/tokens';
 import { useStyles, useTheme } from '../state/Theme';
+import { haptic, motion } from '../design/feedback';
 
 const ICONS = {
   Today: ['today', 'today-outline'],
@@ -28,7 +28,7 @@ function Tab({ variant, label, icon, focused, onPress }) {
 
   if (variant === 'bold') {
     return (
-      <Animated.View layout={LinearTransition.springify().damping(18)} style={focused ? styles.boldWrapOn : styles.boldWrap}>
+      <Animated.View layout={motion(LinearTransition.springify().damping(18))} style={focused ? styles.boldWrapOn : styles.boldWrap}>
         <Pressable onPress={onPress} style={[styles.boldTab, focused && styles.boldTabOn]} {...a11y}>
           <Ionicons name={icon} size={22} color={focused ? colors.onBrand : colors.ink3} />
           {focused ? <Text style={styles.boldLabel} numberOfLines={1}>{label}</Text> : null}
@@ -81,7 +81,7 @@ export default function TabBar({ state, descriptors, navigation }) {
         onPress={() => {
           const e = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
           if (!focused && !e.defaultPrevented) {
-            Haptics.selectionAsync().catch(() => {});
+            haptic.tap();
             navigation.navigate(route.name);
           }
         }}
@@ -144,7 +144,7 @@ const makeStyles = () => StyleSheet.create({
   tab: { flex: 1, alignItems: 'center', gap: 2, minHeight: 48 },
   iconWrap: { width: 58, height: 32, alignItems: 'center', justifyContent: 'center' },
   pill: { ...StyleSheet.absoluteFillObject, borderRadius: 16, backgroundColor: colors.brandSoft },
-  label: { fontFamily: font.medium, fontSize: 12, color: colors.ink3 },
+  label: { fontFamily: font.medium, fontSize: fs(12), color: colors.ink3 },
   labelOn: { color: colors.brand, fontFamily: font.bold },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'transparent', marginTop: 2 },
   dotOn: { backgroundColor: colors.brand },
@@ -152,5 +152,5 @@ const makeStyles = () => StyleSheet.create({
   boldWrapOn: { flex: 2.2 },
   boldTab: { height: 48, borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   boldTabOn: { backgroundColor: colors.brand },
-  boldLabel: { fontFamily: font.bold, fontSize: 14, color: colors.onBrand },
+  boldLabel: { fontFamily: font.bold, fontSize: fs(14), color: colors.onBrand },
 });

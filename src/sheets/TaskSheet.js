@@ -3,7 +3,6 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import BottomSheet from '../components/BottomSheet';
 import { Button, Chips, DayToggles, Field, Label, Stepper, Group, Row, Toggle } from '../components/controls';
 import { pickDate, pickTime } from '../components/pickers';
@@ -17,6 +16,7 @@ import { newId } from '../logic/editing';
 import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey } from '../logic/dates';
 import { PALETTE, colors, space, text, font } from '../design/tokens';
 import { useStyles } from '../state/Theme';
+import { haptic, motion } from '../design/feedback';
 
 const REPEAT = [
   { value: 'once', label: 'חד-פעמית' },
@@ -170,7 +170,7 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
         if (!scope) return;
         await editTask(task, date, scope, t);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      haptic.success();
       await afterChange();
       onDone();
     } catch (e) {
@@ -219,7 +219,7 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
       <Label>קטגוריה</Label>
       <Chips options={catOptions} value={newCat ? NEW_CATEGORY : d.category_id} onChange={chooseCategory} colorFor={(o) => o.color} />
       {newCat ? (
-        <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.newCat}>
+        <Animated.View entering={motion(FadeIn)} exiting={motion(FadeOut)} style={styles.newCat}>
           <Field value={newCat.name} onChangeText={(name) => setNewCat((c) => ({ ...c, name }))} placeholder="שם הקטגוריה, למשל: עבודה" autoFocus />
           <ColorPicker value={newCat.color} onChange={(color) => setNewCat((c) => ({ ...c, color }))} />
           <Button title="יצירת הקטגוריה" kind="soft" icon="add" onPress={createCategory} disabled={!newCat.name.trim()} />
@@ -229,20 +229,20 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
       <Label>חזרה</Label>
       <Chips options={REPEAT} value={d.repeat} onChange={(v) => set({ repeat: v })} />
 
-      <Animated.View layout={LinearTransition} style={styles.block}>
+      <Animated.View layout={motion(LinearTransition)} style={styles.block}>
         {d.repeat === 'weekly' ? (
-          <Animated.View entering={FadeIn} exiting={FadeOut}>
+          <Animated.View entering={motion(FadeIn)} exiting={motion(FadeOut)}>
             <DayToggles value={d.days} onChange={(days) => set({ days })} />
           </Animated.View>
         ) : null}
         {d.repeat === 'interval' ? (
-          <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.inline}>
+          <Animated.View entering={motion(FadeIn)} exiting={motion(FadeOut)} style={styles.inline}>
             <Text style={styles.inlineText}>כל</Text>
             <Stepper value={d.every} onChange={(every) => set({ every })} min={1} max={365} suffix="ימים" />
           </Animated.View>
         ) : null}
         {d.repeat === 'monthly' ? (
-          <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.inline}>
+          <Animated.View entering={motion(FadeIn)} exiting={motion(FadeOut)} style={styles.inline}>
             <Text style={styles.inlineText}>בכל חודש ביום</Text>
             <Stepper value={d.monthDay} onChange={(monthDay) => set({ monthDay })} min={1} max={31} />
           </Animated.View>

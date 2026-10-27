@@ -4,20 +4,23 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import CheckCircle from './CheckCircle';
-import { colors, radius, shadow, space, text, tint } from '../design/tokens';
+import { colors, radius, shadow, space, text, tint, fs, font, layout } from '../design/tokens';
 import { formatTimeRange } from '../logic/dates';
 import { useStyles } from '../state/Theme';
+import { motion } from '../design/feedback';
 
 const SOURCE_ICON = { calendar: 'calendar-outline', panmatz: 'barbell-outline' };
 
-export default function TaskCard({ item, index = 0, onToggle, onPress }) {
+export default function TaskCard({ item, index = 0, onToggle, onPress, onLongPress }) {
   const styles = useStyles(makeStyles);
   const missed = item.missed;
   const meta = [formatTimeRange(item.startTime, item.endTime), item.categoryName].filter(Boolean).join(' · ');
   return (
-    <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 35).duration(260)} layout={LinearTransition.springify().damping(18)}>
+    <Animated.View entering={motion(FadeInDown.delay(Math.min(index, 8) * 35).duration(260))} layout={motion(LinearTransition.springify().damping(18))}>
       <Pressable
         onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={350}
         style={({ pressed }) => [styles.card, missed && styles.cardMissed, pressed && onPress && styles.pressed]}
         accessibilityRole="button"
         accessibilityLabel={`${item.title}, ${meta}${item.done ? ', הושלם' : missed ? ', פספוס' : ''}`}
@@ -48,7 +51,7 @@ export default function TaskCard({ item, index = 0, onToggle, onPress }) {
             missed={missed}
             color={item.color}
             onToggle={onToggle}
-            size={38}
+            size={layout.check}
             label={`סימון ${item.title}`}
           />
         </View>
@@ -63,24 +66,24 @@ const makeStyles = () => StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.card,
     borderRadius: radius.card,
-    paddingVertical: space[4],
+    paddingVertical: layout.cardPadV,
     paddingStart: space[3],
     paddingEnd: space[3],
-    marginBottom: space[3],
-    minHeight: 76,
+    marginBottom: layout.cardGap,
+    minHeight: layout.cardMinH,
     ...shadow.card,
   },
   cardMissed: { backgroundColor: colors.missedSoft },
   pressed: { transform: [{ scale: 0.985 }] },
   strip: { width: 5, alignSelf: 'stretch', borderRadius: 3, marginEnd: space[3] },
   body: { flex: 1, minWidth: 0, gap: 2 },
-  title: { ...text.body, fontFamily: 'Heebo_700Bold', textAlign: 'left' },
+  title: { ...text.body, fontFamily: font.bold, textAlign: 'left' },
   titleDone: { color: colors.ink3, textDecorationLine: 'line-through' },
   metaRow: { flexDirection: 'row', alignItems: 'center' },
   metaIcon: { marginEnd: 4 },
-  meta: { ...text.sub, fontSize: 13, textAlign: 'left', flexShrink: 1 },
+  meta: { ...text.sub, fontSize: fs(13), textAlign: 'left', flexShrink: 1 },
   sub: { ...text.caption, textAlign: 'left' },
   missedPill: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, alignSelf: 'flex-start' },
-  missedText: { ...text.caption, color: colors.missed, fontFamily: 'Heebo_700Bold' },
+  missedText: { ...text.caption, color: colors.missed, fontFamily: font.bold },
   checkWrap: { borderRadius: radius.pill, padding: 4, marginStart: space[2] },
 });

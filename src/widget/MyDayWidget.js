@@ -23,6 +23,13 @@ function widgetColors(p) {
   };
 }
 let C = widgetColors(buildPalette());
+
+// רקע שקוף-למחצה לפי ההגדרות (100 = אטום)
+function withAlpha(hex, opacity) {
+  if (opacity >= 100) return hex;
+  const n = parseInt(hex.slice(1, 7), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${Math.max(0, opacity) / 100})`;
+}
 const F = { regular: 'Heebo-Regular', medium: 'Heebo-Medium', bold: 'Heebo-Bold', heavy: 'Heebo-ExtraBold' };
 
 const checkSvg = (color) =>
@@ -112,9 +119,9 @@ function ProgressBar({ ratio }) {
   );
 }
 
-export function MyDayWidget({ today, items, palette, width = 320, height = 240 }) {
+export function MyDayWidget({ today, items, stats, palette, opacity = 100, width = 320, height = 240 }) {
   C = widgetColors(palette || buildPalette());
-  const p = progress(items);
+  const p = stats || progress(items);
   const compact = width < 260 || height < 200;
   return (
     <FlexWidget
@@ -122,7 +129,7 @@ export function MyDayWidget({ today, items, palette, width = 320, height = 240 }
         width: 'match_parent',
         height: 'match_parent',
         flexDirection: 'column',
-        backgroundColor: C.bg,
+        backgroundColor: withAlpha(C.bg, opacity),
         borderRadius: 24,
         paddingHorizontal: 12,
         paddingTop: 12,
@@ -169,9 +176,9 @@ export function MyDayWidget({ today, items, palette, width = 320, height = 240 }
           clickAction="OPEN_APP"
           style={{ width: 'match_parent', height: 'match_parent', alignItems: 'center', justifyContent: 'center', flexDirection: 'column' }}
         >
-          <TextWidget text="✨" style={{ fontSize: 26 }} />
-          <TextWidget text="אין משימות להיום" style={{ fontSize: 15, fontFamily: F.bold, color: C.ink, marginTop: 4 }} />
-          <TextWidget text="לחץ על + כדי להוסיף" style={{ fontSize: 12, fontFamily: F.regular, color: C.ink3 }} />
+          <TextWidget text={p.total ? '🎉' : '✨'} style={{ fontSize: 26 }} />
+          <TextWidget text={p.total ? 'הכל הושלם להיום!' : 'אין משימות להיום'} style={{ fontSize: 15, fontFamily: F.bold, color: C.ink, marginTop: 4 }} />
+          <TextWidget text={p.total ? 'כל הכבוד' : 'לחץ על + כדי להוסיף'} style={{ fontSize: 12, fontFamily: F.regular, color: C.ink3 }} />
         </FlexWidget>
       )}
     </FlexWidget>

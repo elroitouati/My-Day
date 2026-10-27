@@ -11,9 +11,9 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
-import { colors } from '../design/tokens';
+import { colors, prefs } from '../design/tokens';
 import { useStyles } from '../state/Theme';
+import { haptic } from '../design/feedback';
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const CHECK_LEN = 20;
@@ -28,6 +28,11 @@ export default function CheckCircle({ done: savedDone, color, missed, onToggle, 
   const pop = useSharedValue(1);
 
   useEffect(() => {
+    if (!prefs.motion) {
+      fill.value = done ? 1 : 0;
+      draw.value = done ? 1 : 0;
+      return;
+    }
     fill.value = withSpring(done ? 1 : 0, { damping: 16, stiffness: 220 });
     draw.value = done
       ? withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) })
@@ -44,8 +49,8 @@ export default function CheckCircle({ done: savedDone, color, missed, onToggle, 
   const pathProps = useAnimatedProps(() => ({ strokeDashoffset: CHECK_LEN * (1 - draw.value) }));
 
   const press = () => {
-    pop.value = withSequence(withTiming(0.82, { duration: 90 }), withSpring(1, { damping: 7, stiffness: 260 }));
-    Haptics.impactAsync(done ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    if (prefs.motion) pop.value = withSequence(withTiming(0.82, { duration: 90 }), withSpring(1, { damping: 7, stiffness: 260 }));
+    (done ? haptic.light : haptic.medium)();
     setDone(!done);
     onToggle?.(!done);
   };

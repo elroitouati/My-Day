@@ -2,12 +2,12 @@
 import React from 'react';
 import { View, Text, Pressable, TextInput, Switch, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
-import { colors, radius, shadow, space, text, font, onColor } from '../design/tokens';
+import { colors, radius, shadow, space, text, font, onColor, fs } from '../design/tokens';
 import { HEB_WEEKDAYS_LETTER } from '../logic/dates';
 import { useStyles } from '../state/Theme';
+import { haptic } from '../design/feedback';
 
-const tap = () => Haptics.selectionAsync().catch(() => {});
+const tap = () => haptic.tap();
 
 export function Button({ title, onPress, kind = 'primary', icon, disabled, style }) {
   const styles = useStyles(makeStyles);
@@ -31,6 +31,17 @@ const BTN = () => ({
   ghost: { box: { backgroundColor: 'transparent' }, text: { color: colors.ink2 } },
 });
 
+// כפתור קטן לכותרת מסך (למשל "סידור" / "סיום")
+export function HeaderButton({ icon, label, onPress, active }) {
+  const styles = useStyles(makeStyles);
+  return (
+    <Pressable onPress={onPress} style={[styles.headerBtn, active && styles.headerBtnOn]} accessibilityRole="button" accessibilityLabel={label}>
+      <Ionicons name={icon} size={18} color={active ? colors.onBrand : colors.brand} />
+      <Text style={[styles.headerBtnText, active && { color: colors.onBrand }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 export function Label({ children }) {
   const styles = useStyles(makeStyles);
   return <Text style={styles.label}>{children}</Text>;
@@ -52,7 +63,7 @@ export function Field({ value, onChangeText, placeholder, multiline, autoFocus, 
   );
 }
 
-export function Chips({ options, value, onChange, colorFor }) {
+export function Chips({ options, value, onChange, colorFor, fontFor }) {
   const styles = useStyles(makeStyles);
   return (
     <View style={styles.chips}>
@@ -72,7 +83,7 @@ export function Chips({ options, value, onChange, colorFor }) {
             style={[styles.chip, active && { backgroundColor: c, borderColor: c }]}
           >
             {own && !active ? <View style={[styles.dot, { backgroundColor: own }]} /> : null}
-            <Text style={[styles.chipText, active && styles.chipTextActive, active && { color: onColor(c) }]}>{o.label}</Text>
+            <Text style={[styles.chipText, active && styles.chipTextActive, active && { color: onColor(c) }, fontFor && { fontFamily: fontFor(o) }]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -199,7 +210,10 @@ const makeStyles = () => StyleSheet.create({
   },
   btnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.45 },
-  btnText: { fontFamily: font.bold, fontSize: 16 },
+  btnText: { fontFamily: font.bold, fontSize: fs(16) },
+  headerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingHorizontal: 14, borderRadius: 19, backgroundColor: colors.brandSoft },
+  headerBtnOn: { backgroundColor: colors.brand },
+  headerBtnText: { fontFamily: font.bold, fontSize: fs(14), color: colors.brand },
   label: { ...text.caption, color: colors.ink2, fontFamily: font.bold, marginBottom: -space[2], textAlign: 'left' },
   field: {
     backgroundColor: colors.card,
@@ -208,7 +222,7 @@ const makeStyles = () => StyleSheet.create({
     paddingVertical: space[3],
     minHeight: 52,
     fontFamily: font.medium,
-    fontSize: 16,
+    fontSize: fs(16),
     color: colors.ink,
     textAlign: 'left', // ב-RTL אנדרואיד מחליף left↔right, כך ש-left = תחילת השורה (ימין)
   },
@@ -226,7 +240,7 @@ const makeStyles = () => StyleSheet.create({
     borderColor: colors.line,
   },
   dot: { width: 9, height: 9, borderRadius: 5 },
-  chipText: { fontFamily: font.medium, fontSize: 14, color: colors.ink2 },
+  chipText: { fontFamily: font.medium, fontSize: fs(14), color: colors.ink2 },
   chipTextActive: { color: '#FFFFFF', fontFamily: font.bold },
   days: { flexDirection: 'row', justifyContent: 'space-between' },
   day: {
@@ -240,7 +254,7 @@ const makeStyles = () => StyleSheet.create({
     justifyContent: 'center',
   },
   dayOn: { backgroundColor: colors.brand, borderColor: colors.brand },
-  dayText: { fontFamily: font.bold, fontSize: 15, color: colors.ink2 },
+  dayText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink2 },
   dayTextOn: { color: colors.onBrand },
   stepper: {
     flexDirection: 'row',

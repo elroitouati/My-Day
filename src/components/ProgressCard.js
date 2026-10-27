@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
-import { colors, radius, shadow, space, text } from '../design/tokens';
+import { colors, radius, shadow, space, text, prefs } from '../design/tokens';
 import { useStyles } from '../state/Theme';
 
 export default function ProgressCard({ done, total }) {
@@ -10,7 +10,7 @@ export default function ProgressCard({ done, total }) {
   const ratio = total ? done / total : 0;
   const w = useSharedValue(0);
   useEffect(() => {
-    w.value = withTiming(ratio, { duration: 600, easing: Easing.out(Easing.cubic) });
+    w.value = prefs.motion ? withTiming(ratio, { duration: 600, easing: Easing.out(Easing.cubic) }) : ratio;
   }, [ratio, w]);
   const fill = useAnimatedStyle(() => ({ width: `${w.value * 100}%` }));
   const all = total > 0 && done === total;

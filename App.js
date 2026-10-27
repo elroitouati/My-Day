@@ -10,6 +10,11 @@ import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFonts, Heebo_400Regular, Heebo_500Medium, Heebo_700Bold, Heebo_800ExtraBold } from '@expo-google-fonts/heebo';
+import { Rubik_400Regular, Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold } from '@expo-google-fonts/rubik';
+import { Assistant_400Regular, Assistant_600SemiBold, Assistant_700Bold, Assistant_800ExtraBold } from '@expo-google-fonts/assistant';
+import { VarelaRound_400Regular } from '@expo-google-fonts/varela-round';
+import { FrankRuhlLibre_400Regular, FrankRuhlLibre_500Medium, FrankRuhlLibre_700Bold, FrankRuhlLibre_900Black } from '@expo-google-fonts/frank-ruhl-libre';
+import { AmaticSC_400Regular, AmaticSC_700Bold } from '@expo-google-fonts/amatic-sc';
 
 import { AppStateProvider, useAppState } from './src/state/AppState';
 import TabBar from './src/components/TabBar';
@@ -40,8 +45,9 @@ const navThemeFor = () => ({
 });
 
 function Tabs() {
+  const { startTab } = useTheme(); // המסך שנפתח — לפי ההגדרות
   return (
-    <Tab.Navigator tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
+    <Tab.Navigator initialRouteName={startTab} tabBar={(p) => <TabBar {...p} />} screenOptions={{ headerShown: false }}>
       <Tab.Screen name="Today" component={TodayScreen} options={{ title: 'היום' }} />
       <Tab.Screen name="Week" component={WeekScreen} options={{ title: 'שבוע' }} />
       <Tab.Screen name="Month" component={MonthScreen} options={{ title: 'חודש' }} />
@@ -66,7 +72,15 @@ function DeepLinks() {
 }
 
 export default function App() {
-  const [fontsLoaded, fontError] = useFonts({ Heebo_400Regular, Heebo_500Medium, Heebo_700Bold, Heebo_800ExtraBold });
+  // כל הגופנים לבחירה ב"מראה" נטענים מראש, כדי שהחלפה תהיה מיידית
+  const [fontsLoaded, fontError] = useFonts({
+    Heebo_400Regular, Heebo_500Medium, Heebo_700Bold, Heebo_800ExtraBold,
+    Rubik_400Regular, Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold,
+    Assistant_400Regular, Assistant_600SemiBold, Assistant_700Bold, Assistant_800ExtraBold,
+    VarelaRound_400Regular,
+    FrankRuhlLibre_400Regular, FrankRuhlLibre_500Medium, FrankRuhlLibre_700Bold, FrankRuhlLibre_900Black,
+    AmaticSC_400Regular, AmaticSC_700Bold,
+  });
   const [theme, setTheme] = useState(null);
 
   useEffect(() => {

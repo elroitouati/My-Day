@@ -4,6 +4,7 @@ import * as Notifications from 'expo-notifications';
 import { getSettings, loadRange } from '../db/repo';
 import { addDays, keyTimeToDate, rangeKeys, todayKey, formatTimeRange } from '../logic/dates';
 import { coalesce } from './events';
+import { inQuietHours } from '../logic/arrange';
 import { colors } from '../design/tokens';
 
 export const TASK_CATEGORY = 'task-reminder';
@@ -41,7 +42,7 @@ export function setupNotifications() {
           lightColor: colors.brand,
         });
         await Notifications.setNotificationChannelAsync('evening', {
-          name: 'תזכורת ערב',
+          name: 'תזכורות בוקר וערב',
           importance: Notifications.AndroidImportance.DEFAULT,
           lightColor: colors.brand,
         });
@@ -80,6 +81,10 @@ function reminderBody(item, minutes) {
   return `בעוד ${minutes} דקות · ${range}`;
 }
 
+function morningBody(count) {
+  return count === 1 ? 'יש לך משימה אחת היום' : `יש לך ${count} משימות היום`;
+}
+
 function eveningBody(open) {
   return open === 1 ? 'נשארה לך משימה אחת להיום' : `נשארו לך ${open} משימות להיום`;
 }
@@ -98,6 +103,8 @@ async function rescheduleNow() {
   const byDate = await loadRange(today, end);
   const now = Date.now() + 5000;
   let taskCount = 0;
+  const quiet = { enabled: settings.quietEnabled, from: settings.quietFrom, to: settings.quietTo, shabbat: settings.quietShabbat };
+  const allowed = (ms) => ms > now && !inQuietHours(new Date(ms), quiet); // בלי התראות בשעות השקט
 
   for (const date of rangeKeys(today, end)) {
     const items = byDate[date] || [];
@@ -107,7 +114,7 @@ async function rescheduleNow() {
       const minutes = item.task.reminder;
       if (minutes == null) continue;
       const at = keyTimeToDate(date, item.startTime).getTime() - minutes * 60000;
-      if (at <= now) continue;
+      if (!allowed(at)) continue;
       taskCount += 1;
       await Notifications.scheduleNotificationAsync({
         identifier: `task:${item.id}:${date}`,
@@ -122,10 +129,22 @@ async function rescheduleNow() {
       });
     }
 
+    if (settings.morningEnabled) {
+      const at = keyTimeToDate(date, settings.morningTime || '07:30').getTime();
+      const open = items.filter((i) => !i.done).length;
+      if (allowed(at) && open > 0) {
+        await Notifications.scheduleNotificationAsync({
+          identifier: `morning:${date}`,
+          content: { title: 'בוקר טוב ☀️', body: morningBody(open), data: { type: 'morning', date } },
+          trigger: { date: new Date(at), channelId: 'evening' },
+        });
+      }
+    }
+
     if (settings.eveningEnabled) {
       const at = keyTimeToDate(date, settings.eveningTime || '21:00').getTime();
       const open = items.filter((i) => !i.done).length;
-      if (at > now && open > 0) {
+      if (allowed(at) && open > 0) {
         await Notifications.scheduleNotificationAsync({
           identifier: `evening:${date}`,
           content: { title: 'My Day', body: eveningBody(open), data: { type: 'evening', date } },

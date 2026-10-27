@@ -3,25 +3,41 @@
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { applyTheme } from '../design/tokens';
 import { setSetting } from '../db/repo';
+import { refreshWidget } from '../widget/update';
 
 const ThemeCtx = createContext({ mode: 'light', accent: 'violet', tabStyle: 'classic', version: 0, setTheme: () => {} });
 
-export const DEFAULT_THEME = { mode: 'light', accent: 'violet', tabStyle: 'classic' };
+export const DEFAULT_THEME = {
+  mode: 'light',
+  accent: 'violet',
+  tabStyle: 'classic',
+  font: 'heebo',
+  textSize: 'm',
+  density: 'comfy',
+  motion: true,
+  haptics: true,
+  doneItems: 'inline', // inline | bottom | hide
+  sortMode: 'auto', // auto | manual
+  startTab: 'Today',
+};
 
 export function ThemeProvider({ initial, children }) {
   const [theme, setThemeState] = useState(() => {
     const t = { ...DEFAULT_THEME, ...(initial || {}) };
-    applyTheme(t.mode, t.accent);
+    applyTheme(t);
     return { ...t, version: 0 };
   });
 
   const setTheme = useCallback((patch) => {
     setThemeState((prev) => {
       const next = { ...prev, ...patch, version: prev.version + 1 };
-      applyTheme(next.mode, next.accent);
+      applyTheme(next);
       return next;
     });
-    Object.entries(patch).forEach(([k, v]) => setSetting(`theme_${k}`, v).catch(() => {}));
+    // נשמר, ואז גם הווידג'ט מתעדכן (צבעים, סדר, משימות שבוצעו)
+    Promise.all(Object.entries(patch).map(([k, v]) => setSetting(`theme_${k}`, v)))
+      .then(() => refreshWidget())
+      .catch(() => {});
   }, []);
 
   const value = useMemo(() => ({ ...theme, setTheme }), [theme, setTheme]);
@@ -41,9 +57,9 @@ export function useStyles(makeStyles) {
 
 // קריאת הערכה השמורה (לפני הרינדור הראשון)
 export function themeFromSettings(s) {
-  return {
-    mode: s.theme_mode || DEFAULT_THEME.mode,
-    accent: s.theme_accent || DEFAULT_THEME.accent,
-    tabStyle: s.theme_tabStyle || DEFAULT_THEME.tabStyle,
-  };
+  const out = {};
+  Object.keys(DEFAULT_THEME).forEach((k) => {
+    out[k] = s[`theme_${k}`] ?? DEFAULT_THEME[k];
+  });
+  return out;
 }

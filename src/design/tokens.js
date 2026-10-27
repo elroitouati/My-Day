@@ -106,22 +106,63 @@ export function buildPalette(mode = 'light', accentId = 'violet') {
   };
 }
 
+// גופנים לבחירה (כולם תומכים בעברית). scale מיישר גופנים שנראים קטנים/גדולים מהרגיל.
+export const FONTS = [
+  { id: 'heebo', name: 'היבו', regular: 'Heebo_400Regular', medium: 'Heebo_500Medium', bold: 'Heebo_700Bold', heavy: 'Heebo_800ExtraBold', scale: 1 },
+  { id: 'rubik', name: 'רוביק', regular: 'Rubik_400Regular', medium: 'Rubik_500Medium', bold: 'Rubik_700Bold', heavy: 'Rubik_800ExtraBold', scale: 0.97 },
+  { id: 'assistant', name: 'אסיסטנט', regular: 'Assistant_400Regular', medium: 'Assistant_600SemiBold', bold: 'Assistant_700Bold', heavy: 'Assistant_800ExtraBold', scale: 1.04 },
+  { id: 'varela', name: 'ורלה עגול', regular: 'VarelaRound_400Regular', medium: 'VarelaRound_400Regular', bold: 'VarelaRound_400Regular', heavy: 'VarelaRound_400Regular', scale: 0.96 },
+  { id: 'frank', name: 'פרנק־רוהל', regular: 'FrankRuhlLibre_400Regular', medium: 'FrankRuhlLibre_500Medium', bold: 'FrankRuhlLibre_700Bold', heavy: 'FrankRuhlLibre_900Black', scale: 1.05 },
+  { id: 'amatic', name: 'כתב יד', regular: 'AmaticSC_400Regular', medium: 'AmaticSC_400Regular', bold: 'AmaticSC_700Bold', heavy: 'AmaticSC_700Bold', scale: 1.3 },
+];
+
+export const TEXT_SIZES = [
+  { id: 's', name: 'קטן', scale: 0.9 },
+  { id: 'm', name: 'רגיל', scale: 1 },
+  { id: 'l', name: 'גדול', scale: 1.15 },
+  { id: 'xl', name: 'ענק', scale: 1.3 },
+];
+
+export const DENSITIES = [
+  { id: 'comfy', name: 'מרווח' },
+  { id: 'compact', name: 'דחוס' },
+];
+
 export const colors = {};
 export const text = {};
 export const shadow = {};
+export const font = {};
+// מידות שמשתנות לפי הצפיפות שנבחרה
+export const layout = {};
+// העדפות שקוד שאינו סגנון קורא (רטט, אנימציות)
+export const prefs = { motion: true, haptics: true };
 
-export const font = {
-  regular: 'Heebo_400Regular',
-  medium: 'Heebo_500Medium',
-  bold: 'Heebo_700Bold',
-  heavy: 'Heebo_800ExtraBold',
-};
+let fontScale = 1;
+// גודל גופן לפי גודל הטקסט והגופן שנבחרו
+export const fs = (n) => Math.round(n * fontScale);
 
 // מעדכן את הטוקנים החיים לערכה שנבחרה
-export function applyTheme(mode, accentId) {
-  const p = buildPalette(mode, accentId);
+export function applyTheme(t = {}) {
+  const p = buildPalette(t.mode, t.accent);
   Object.keys(colors).forEach((k) => delete colors[k]);
   Object.assign(colors, p);
+
+  const f = FONTS.find((x) => x.id === t.font) || FONTS[0];
+  Object.assign(font, { regular: f.regular, medium: f.medium, bold: f.bold, heavy: f.heavy });
+  fontScale = (TEXT_SIZES.find((x) => x.id === t.textSize) || TEXT_SIZES[1]).scale * f.scale;
+
+  const compact = t.density === 'compact';
+  Object.assign(layout, {
+    compact,
+    cardPadV: compact ? 9 : 16,
+    cardMinH: compact ? 56 : 76,
+    cardGap: compact ? 8 : 12,
+    check: compact ? 32 : 38,
+    sectionGap: compact ? 8 : 12,
+  });
+  prefs.motion = t.motion !== false;
+  prefs.haptics = t.haptics !== false;
+
   Object.assign(shadow, {
     card: {
       shadowColor: colors.shadow,
@@ -138,17 +179,18 @@ export function applyTheme(mode, accentId) {
       elevation: 8,
     },
   });
+  const tx = (family, size, lh, color) => ({ fontFamily: family, fontSize: fs(size), lineHeight: fs(lh), color });
   Object.assign(text, {
-    hero: { fontFamily: font.heavy, fontSize: 32, lineHeight: 40, color: colors.ink },
-    title: { fontFamily: font.bold, fontSize: 22, lineHeight: 30, color: colors.ink },
-    heading: { fontFamily: font.bold, fontSize: 17, lineHeight: 24, color: colors.ink },
-    body: { fontFamily: font.medium, fontSize: 16, lineHeight: 23, color: colors.ink },
-    sub: { fontFamily: font.regular, fontSize: 14, lineHeight: 20, color: colors.ink2 },
-    caption: { fontFamily: font.medium, fontSize: 12, lineHeight: 16, color: colors.ink3 },
+    hero: tx(font.heavy, 32, 40, colors.ink),
+    title: tx(font.bold, 22, 30, colors.ink),
+    heading: tx(font.bold, 17, 24, colors.ink),
+    body: tx(font.medium, 16, 23, colors.ink),
+    sub: tx(font.regular, 14, 20, colors.ink2),
+    caption: tx(font.medium, 12, 16, colors.ink3),
   });
 }
 
-applyTheme('light', 'violet');
+applyTheme({});
 
 // פלטת צבעים חיים לקטגוריות
 export const PALETTE = [

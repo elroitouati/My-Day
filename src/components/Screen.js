@@ -5,8 +5,9 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, space, text } from '../design/tokens';
+import { colors, space, text, font } from '../design/tokens';
 import { useStyles } from '../state/Theme';
+import { motion } from '../design/feedback';
 
 export function useFocusKey() {
   const [k, setK] = useState(0);
@@ -52,7 +53,7 @@ export default function Screen({ title, eyebrow, subtitle, onBack, action, child
     : undefined;
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <Animated.View key={focusKey} entering={FadeIn.duration(220)} style={styles.root}>
+      <Animated.View key={focusKey} entering={motion(FadeIn.duration(220))} style={styles.root}>
         {scroll ? (
           <ScrollView
             contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}
@@ -80,7 +81,7 @@ const makeStyles = () => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingTop: space[4], paddingBottom: space[2] },
   back: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center' },
   headerTexts: { flex: 1, minWidth: 0 },
-  eyebrow: { ...text.caption, color: colors.brand, fontFamily: 'Heebo_700Bold', textAlign: 'left' },
+  eyebrow: { ...text.caption, color: colors.brand, fontFamily: font.bold, textAlign: 'left' },
   title: { ...text.hero, textAlign: 'left' },
   subtitle: { ...text.sub, textAlign: 'left' },
 });

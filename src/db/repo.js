@@ -11,6 +11,12 @@ export const DEFAULT_SETTINGS = {
   notificationsEnabled: true,
   eveningEnabled: true,
   eveningTime: '21:00',
+  morningEnabled: true,
+  morningTime: '07:30',
+  quietEnabled: false,
+  quietFrom: '22:00',
+  quietTo: '07:00',
+  quietShabbat: false,
   defaultReminder: 10,
   calendarIds: null, // null = עוד לא נבחרו יומנים (בפעם הראשונה בוחרים את כולם)
   calendarEnabled: false,
@@ -218,6 +224,30 @@ export async function dequeue(change) {
     'DELETE FROM sync_queue WHERE date = ? AND goal_id = ? AND updated_at = ?',
     change.date, change.goal_id, change.updated_at
   );
+}
+
+// ---------------------------------------------------------------------------
+//  סדר ידני ליום (נשמר בגרירה)
+// ---------------------------------------------------------------------------
+export async function getDayOrder(date) {
+  const db = await getDb();
+  const row = await db.getFirstAsync('SELECT uids FROM day_order WHERE date = ?', date);
+  try {
+    return row ? JSON.parse(row.uids) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function setDayOrder(date, uids) {
+  const db = await getDb();
+  await db.runAsync('INSERT OR REPLACE INTO day_order (date, uids) VALUES (?, ?)', date, JSON.stringify(uids));
+}
+
+// העברת משימה (או מופע אחד של משימה קבועה) ליום אחר
+export async function moveTaskOccurrence(task, fromDate, toDate) {
+  const draft = { ...task, kind: 'once', date: toDate, rule: null, start_date: null, end_date: null };
+  await editTask(task, fromDate, task.kind === 'recurring' ? 'one' : 'all', draft);
 }
 
 // ---------------------------------------------------------------------------

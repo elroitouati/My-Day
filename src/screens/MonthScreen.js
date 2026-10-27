@@ -7,8 +7,9 @@ import Screen from '../components/Screen';
 import { useAppState, useRange } from '../state/AppState';
 import { buildMonthGrid, monthLabel, keyToDate, HEB_WEEKDAYS_LETTER, dayKey } from '../logic/dates';
 import { progress } from '../logic/dayItems';
-import { colors, radius, shadow, space, text, font } from '../design/tokens';
+import { colors, radius, shadow, space, text, font, fs } from '../design/tokens';
 import { useStyles } from '../state/Theme';
+import { motion } from '../design/feedback';
 
 export default function MonthScreen({ navigation }) {
   const styles = useStyles(makeStyles);
@@ -45,7 +46,7 @@ export default function MonthScreen({ navigation }) {
         </View>
       }
     >
-      <Animated.View key={`${ym.y}-${ym.m}`} entering={FadeIn.duration(250)} style={styles.card}>
+      <Animated.View key={`${ym.y}-${ym.m}`} entering={motion(FadeIn.duration(250))} style={styles.card}>
         <View style={styles.week}>
           {HEB_WEEKDAYS_LETTER.map((l) => (
             <Text key={l} style={styles.weekday}>{l}</Text>
@@ -103,7 +104,7 @@ const makeStyles = () => StyleSheet.create({
   nav: { flexDirection: 'row', gap: 6 },
   navBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...shadow.card },
   todayBtn: { width: undefined, paddingHorizontal: 12 },
-  todayText: { fontFamily: font.bold, fontSize: 13, color: colors.brand },
+  todayText: { fontFamily: font.bold, fontSize: fs(13), color: colors.brand },
   card: { backgroundColor: colors.card, borderRadius: radius.card, padding: space[2], ...shadow.card },
   week: { flexDirection: 'row' },
   weekday: { flex: 1, textAlign: 'center', ...text.caption, fontFamily: font.bold, paddingVertical: space[2] },
@@ -112,7 +113,7 @@ const makeStyles = () => StyleSheet.create({
   num: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   numToday: { backgroundColor: colors.brand },
   numAll: { backgroundColor: colors.successSoft },
-  numText: { fontFamily: font.bold, fontSize: 15, color: colors.ink },
+  numText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink },
   numTextToday: { color: colors.onBrand },
   numTextAll: { color: colors.success },
   numTextPast: { color: colors.ink2 },

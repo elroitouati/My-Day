@@ -79,6 +79,13 @@ const MIGRATIONS = [
     ('home', 'בית', '#FF8A00', 2),
     ('health', 'בריאות', '#10C77F', 3);
   `,
+  // גרסה 2 — סדר ידני של המשימות בכל יום (גרירה)
+  `
+  CREATE TABLE IF NOT EXISTS day_order (
+    date TEXT PRIMARY KEY NOT NULL,
+    uids TEXT NOT NULL
+  );
+  `,
 ];
 
 let dbPromise = null;

@@ -1,9 +1,10 @@
 // יום מסוים (נפתח מהשבוע או מהחודש)
-import React from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Screen from '../components/Screen';
 import ProgressCard from '../components/ProgressCard';
 import DayList from '../components/DayList';
+import { HeaderButton } from '../components/controls';
 import Fab from '../components/Fab';
 import { useAppState, useRange } from '../state/AppState';
 import { progress } from '../logic/dayItems';
@@ -26,6 +27,7 @@ export default function DayScreen({ route, navigation }) {
   const items = byDate[date] || [];
   const p = progress(items);
   const past = date < today;
+  const [reorder, setReorder] = useState(false);
   return (
     <View style={styles.root}>
       <Screen
@@ -33,11 +35,14 @@ export default function DayScreen({ route, navigation }) {
         title={formatDayTitle(date)}
         subtitle={formatHebDate(date, { year: true })}
         onBack={() => navigation.goBack()}
+        action={items.length > 1 ? <HeaderButton icon={reorder ? 'checkmark' : 'swap-vertical'} label={reorder ? 'סיום' : 'סידור'} active={reorder} onPress={() => setReorder((r) => !r)} /> : null}
       >
         {p.total ? <ProgressCard done={p.done} total={p.total} /> : null}
         {loaded ? (
           <DayList
             items={items}
+            date={date}
+            reorder={reorder}
             emptyTitle={past ? 'לא היו משימות ביום הזה' : 'אין משימות ביום הזה'}
             emptySubtitle={past ? '' : 'אפשר להוסיף משימה בכפתור +'}
           />
