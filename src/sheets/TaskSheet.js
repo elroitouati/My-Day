@@ -8,13 +8,14 @@ import BottomSheet from '../components/BottomSheet';
 import { Button, Chips, DayToggles, Field, Label, Stepper, Group, Row, Toggle } from '../components/controls';
 import { pickDate, pickTime } from '../components/pickers';
 import { useAppState } from '../state/AppState';
-import { createTask, editTask, removeTask } from '../db/repo';
+import { createTask, editTask, removeTask, saveCategory } from '../db/repo';
+import ColorPicker from '../components/ColorPicker';
 import { afterChange } from '../services/actions';
 import { REMINDER_OPTIONS } from '../services/notifications';
 import { parseRule, validateRule } from '../logic/recurrence';
 import { newId } from '../logic/editing';
 import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey } from '../logic/dates';
-import { colors, space, text, font } from '../design/tokens';
+import { PALETTE, colors, space, text, font } from '../design/tokens';
 
 const REPEAT = [
   { value: 'once', label: 'חד-פעמית' },
@@ -29,7 +30,7 @@ function initialDraft(task, date, settings, categories) {
   if (!task) {
     return {
       title: '',
-      category_id: categories[0]?.id ?? null,
+      category_id: null, // קטגוריה לא חובה
       notes: '',
       timed: false,
       start_time: '09:00',
@@ -105,24 +106,45 @@ function askScope(verb) {
 }
 
 export default function TaskSheet() {
-  const { sheet, closeTaskSheet, categories, settings } = useAppState();
+  const { sheet, closeTaskSheet, categories, settings, reloadMeta } = useAppState();
   return (
     <BottomSheet visible={!!sheet} onClose={closeTaskSheet}>
-      {sheet ? <TaskForm key={sheet.key} sheet={sheet} categories={categories} settings={settings} onDone={closeTaskSheet} /> : null}
+      {sheet ? <TaskForm key={sheet.key} sheet={sheet} categories={categories} settings={settings} reloadMeta={reloadMeta} onDone={closeTaskSheet} /> : null}
     </BottomSheet>
   );
 }
 
-function TaskForm({ sheet, categories, settings, onDone }) {
+const NEW_CATEGORY = '__new';
+
+function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
   const { task, date } = sheet;
   const [d, setD] = useState(() => initialDraft(task, date, settings, categories));
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const set = (patch) => setD((x) => ({ ...x, ...patch }));
+  const [newCat, setNewCat] = useState(null); // { name, color } כשיוצרים קטגוריה מתוך הגיליון
   const catOptions = useMemo(
-    () => [...categories.map((c) => ({ value: c.id, label: c.name, color: c.color })), { value: null, label: 'כללי', color: '#9AA0B4' }],
+    () => [
+      { value: null, label: 'בלי קטגוריה' },
+      ...categories.map((c) => ({ value: c.id, label: c.name, color: c.color || null })),
+      { value: NEW_CATEGORY, label: '+ קטגוריה חדשה' },
+    ],
     [categories]
   );
+  const chooseCategory = (v) => {
+    if (v === NEW_CATEGORY) setNewCat({ name: '', color: PALETTE[categories.length % PALETTE.length] });
+    else {
+      setNewCat(null);
+      set({ category_id: v });
+    }
+  };
+  const createCategory = async () => {
+    if (!newCat?.name.trim()) return;
+    const id = await saveCategory({ name: newCat.name.trim(), color: newCat.color || '' });
+    await reloadMeta();
+    set({ category_id: id });
+    setNewCat(null);
+  };
 
   const setStart = (t) => {
     const s = timeToMinutes(t);
@@ -193,7 +215,14 @@ function TaskForm({ sheet, categories, settings, onDone }) {
       />
 
       <Label>קטגוריה</Label>
-      <Chips options={catOptions} value={d.category_id} onChange={(v) => set({ category_id: v })} colorFor={(o) => o.color} />
+      <Chips options={catOptions} value={newCat ? NEW_CATEGORY : d.category_id} onChange={chooseCategory} colorFor={(o) => o.color} />
+      {newCat ? (
+        <Animated.View entering={FadeIn} exiting={FadeOut} style={styles.newCat}>
+          <Field value={newCat.name} onChangeText={(name) => setNewCat((c) => ({ ...c, name }))} placeholder="שם הקטגוריה, למשל: עבודה" autoFocus />
+          <ColorPicker value={newCat.color} onChange={(color) => setNewCat((c) => ({ ...c, color }))} />
+          <Button title="יצירת הקטגוריה" kind="soft" icon="add" onPress={createCategory} disabled={!newCat.name.trim()} />
+        </Animated.View>
+      ) : null}
 
       <Label>חזרה</Label>
       <Chips options={REPEAT} value={d.repeat} onChange={(v) => set({ repeat: v })} />
@@ -280,6 +309,7 @@ function TaskForm({ sheet, categories, settings, onDone }) {
 const styles = StyleSheet.create({
   form: { gap: space[4] },
   block: { gap: space[4] },
+  newCat: { gap: space[3], backgroundColor: colors.sunken, borderRadius: 24, padding: space[4] },
   heading: { ...text.title, textAlign: 'left' },
   inline: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   inlineText: { ...text.body },

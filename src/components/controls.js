@@ -53,7 +53,8 @@ export function Chips({ options, value, onChange, colorFor }) {
     <View style={styles.chips}>
       {options.map((o) => {
         const active = o.value === value;
-        const c = colorFor ? colorFor(o) : colors.brand;
+        const own = colorFor ? colorFor(o) : null;
+        const c = own || colors.brand;
         return (
           <Pressable
             key={String(o.value)}
@@ -65,7 +66,7 @@ export function Chips({ options, value, onChange, colorFor }) {
             accessibilityState={{ selected: active }}
             style={[styles.chip, active && { backgroundColor: c, borderColor: c }]}
           >
-            {colorFor && !active ? <View style={[styles.dot, { backgroundColor: c }]} /> : null}
+            {own && !active ? <View style={[styles.dot, { backgroundColor: own }]} /> : null}
             <Text style={[styles.chipText, active && styles.chipTextActive]}>{o.label}</Text>
           </Pressable>
         );

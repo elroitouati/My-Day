@@ -7,7 +7,7 @@ import { timeToMinutes } from './dates';
 
 export const PANMATZ_CATEGORY = { id: 'panmatz', name: 'פנמ"צ', color: '#E0A100' };
 export const CALENDAR_CATEGORY = { id: 'calendar', name: 'יומן', color: '#4C8DFF' };
-export const UNCATEGORIZED = { id: null, name: 'כללי', color: '#9AA0B4' };
+export const UNCATEGORIZED = { id: null, name: '', color: '#9AA0B4' }; // משימה בלי קטגוריה: אפור, בלי שם
 
 export const itemKeyForTask = (id) => `task:${id}`;
 export const itemKeyForEvent = (eventId) => `cal:${eventId}`;
@@ -34,7 +34,7 @@ export function buildRangeItems(startKey, endKey, data, today) {
         date,
         title: task.title,
         notes: task.notes || '',
-        color: cat.color,
+        color: cat.color || UNCATEGORIZED.color,
         categoryName: cat.name,
         startTime: task.start_time || null,
         endTime: task.end_time || null,

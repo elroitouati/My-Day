@@ -11,7 +11,7 @@ const SOURCE_ICON = { calendar: 'calendar-outline', panmatz: 'barbell-outline' }
 
 export default function TaskCard({ item, index = 0, onToggle, onPress }) {
   const missed = item.missed;
-  const meta = [formatTimeRange(item.startTime, item.endTime), item.categoryName].join(' · ');
+  const meta = [formatTimeRange(item.startTime, item.endTime), item.categoryName].filter(Boolean).join(' · ');
   return (
     <Animated.View entering={FadeInDown.delay(Math.min(index, 8) * 35).duration(260)} layout={LinearTransition.springify().damping(18)}>
       <Pressable

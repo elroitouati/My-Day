@@ -16,7 +16,7 @@ import { hasCalendarPermission, requestCalendarPermission, listCalendars, refres
 import { supabaseConfigured, signIn, signUp, signOut, authErrorText } from '../services/supabase';
 import { syncPanmatz, getLastSyncError } from '../services/panmatzSync';
 import { clearPanmatz } from '../db/repo';
-import { PANMATZ_CATEGORY } from '../logic/dayItems';
+import { PANMATZ_CATEGORY, UNCATEGORIZED } from '../logic/dayItems';
 import { colors, space, text, font } from '../design/tokens';
 
 export default function SettingsScreen() {
@@ -76,7 +76,7 @@ export default function SettingsScreen() {
     <Screen eyebrow="My Day" title="הגדרות">
       <Group title="קטגוריות">
         {categories.map((c) => (
-          <Row key={c.id} icon="pricetag" iconColor={c.color} title={c.name} chevron onPress={() => setEditCat(c)} />
+          <Row key={c.id} icon="pricetag" iconColor={c.color || UNCATEGORIZED.color} title={c.name} chevron onPress={() => setEditCat(c)} />
         ))}
         <Row icon="add" title="קטגוריה חדשה" onPress={() => setEditCat({ name: '', color: null })} />
       </Group>
