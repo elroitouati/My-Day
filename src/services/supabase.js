@@ -3,8 +3,13 @@ import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+// ברירת מחדל: הפרויקט של My Day. מפתח ה-anon ציבורי מעצם הגדרתו — ה-RLS הוא שמגן על הנתונים.
+// כך גם עדכונים "באוויר" (שנבנים בלי .env) מקבלים את הכתובת והמפתח.
+const DEFAULT_URL = 'https://iqekfoywkywyhlpgmhwy.supabase.co';
+const DEFAULT_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxZWtmb3l3a3l3eWhscGdtaHd5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTEyMDAsImV4cCI6MjEwODY4NzIwMH0.YjeKjpFqfXVv1dtjSaPZhp3ePB03uIx5LPNSCguBy4c';
+const url = process.env.EXPO_PUBLIC_SUPABASE_URL || DEFAULT_URL;
+const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_ANON_KEY;
 
 export const supabaseConfigured = Boolean(url && anonKey && !url.includes('YOUR-PROJECT'));
 

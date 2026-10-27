@@ -1,0 +1,14 @@
+# בנייה מלאה של APK — רק כשמוסיפים רכיב נייטיב חדש (נדיר).
+# מפעילים מהאתר: expo.dev ← הפרויקט ← Workflows ← Build APK ← Run.
+name: Build APK
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build_android:
+    name: Build Android APK
+    type: build
+    params:
+      platform: android
+      profile: preview

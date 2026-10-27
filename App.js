@@ -25,6 +25,7 @@ import MonthScreen from './src/screens/MonthScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import DayScreen from './src/screens/DayScreen';
 import WidgetEditorScreen from './src/screens/WidgetEditorScreen';
+import UpdateBanner from './src/components/UpdateBanner';
 import { registerBackgroundTask } from './src/services/background';
 import { setupNotifications, requestNotificationPermission, rescheduleNotifications } from './src/services/notifications';
 import { getSettings, setSetting } from './src/db/repo';
@@ -138,6 +139,7 @@ function Root({ onReady }) {
             </NavigationContainer>
             <TaskSheet />
             <DeepLinks />
+            <UpdateBanner />
           </View>
         </AppStateProvider>
       </SafeAreaProvider>

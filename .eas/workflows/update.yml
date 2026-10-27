@@ -1,0 +1,14 @@
+# עדכון אוטומטי "באוויר": בכל דחיפה לענף, Expo מפרסם עדכון לאפליקציה שכבר מותקנת.
+# האפליקציה מורידה אותו בפתיחה ומציעה להפעיל מחדש — בלי APK חדש.
+name: Publish update to the app
+
+on:
+  push:
+    branches: ['ccr-387ca696-t79jgx']
+
+jobs:
+  update:
+    name: Publish update (preview)
+    type: update
+    params:
+      branch: preview
