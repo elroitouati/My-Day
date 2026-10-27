@@ -14,7 +14,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#F5F6FA"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "android": {
       "package": "com.elroi.myday",
       "adaptiveIcon": {
@@ -29,7 +31,9 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE"
       ],
-      "blockedPermissions": ["android.permission.WRITE_CALENDAR"]
+      "blockedPermissions": [
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "plugins": [
       [
@@ -43,6 +47,13 @@
         "expo-calendar",
         {
           "calendarPermission": "My Day מציגה את האירועים מהיומן שלך כמשימות שאפשר לסמן."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "My Day משתמשת בתמונה שתבחר כרקע לווידג'ט.",
+          "cameraPermission": false
         }
       ],
       "expo-background-fetch",
@@ -61,10 +72,10 @@
               "name": "MyDay",
               "label": "My Day",
               "description": "המשימות של היום, עם סימון V ישירות ממסך הבית",
-              "minWidth": "250dp",
-              "minHeight": "180dp",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
               "targetCellWidth": 4,
-              "targetCellHeight": 3,
+              "targetCellHeight": 2,
               "maxResizeWidth": "600dp",
               "maxResizeHeight": "900dp",
               "previewImage": "./assets/widget-preview.png",

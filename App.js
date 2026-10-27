@@ -24,6 +24,7 @@ import WeekScreen from './src/screens/WeekScreen';
 import MonthScreen from './src/screens/MonthScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import DayScreen from './src/screens/DayScreen';
+import WidgetEditorScreen from './src/screens/WidgetEditorScreen';
 import { registerBackgroundTask } from './src/services/background';
 import { setupNotifications, requestNotificationPermission, rescheduleNotifications } from './src/services/notifications';
 import { getSettings, setSetting } from './src/db/repo';
@@ -132,6 +133,7 @@ function Root({ onReady }) {
               <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'fade_from_bottom' }}>
                 <Stack.Screen name="Tabs" component={Tabs} />
                 <Stack.Screen name="Day" component={DayScreen} options={{ animation: 'slide_from_left' }} />
+                <Stack.Screen name="WidgetEditor" component={WidgetEditorScreen} options={{ animation: 'slide_from_left' }} />
               </Stack.Navigator>
             </NavigationContainer>
             <TaskSheet />

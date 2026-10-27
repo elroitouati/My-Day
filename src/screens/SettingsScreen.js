@@ -23,7 +23,7 @@ import { colors, space, text, font, ACCENTS, TAB_STYLES, FONTS, TEXT_SIZES, DENS
 import { useStyles, useTheme } from '../state/Theme';
 import { haptic } from '../design/feedback';
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const styles = useStyles(makeStyles);
   const { categories, settings, updateSetting } = useAppState();
   const [editCat, setEditCat] = useState(null);
@@ -140,19 +140,9 @@ export default function SettingsScreen() {
       <PanmatzSection />
 
       <Group title="ווידג'ט" footer="לחיצה ארוכה על מסך הבית ← ווידג'טים ← My Day. הווידג'ט מתעדכן לבד, וגם בכל פתיחה של האפליקציה.">
-        <Row icon="checkmark-done-outline" title="להציג משימות שהושלמו" trailing={<Toggle value={settings.widget_showDone !== false} onValueChange={(v) => updateSetting('widget_showDone', v)} />} />
-        <Row icon="calendar-outline" title="להציג אירועי יומן" trailing={<Toggle value={settings.widget_showCalendar !== false} onValueChange={(v) => updateSetting('widget_showCalendar', v)} />} />
-        <Row icon="barbell-outline" title='להציג אימוני פנמ"צ' trailing={<Toggle value={settings.widget_showPanmatz !== false} onValueChange={(v) => updateSetting('widget_showPanmatz', v)} />} />
-        <Row icon="apps-outline" title="רענון הווידג'ט עכשיו" chevron onPress={() => refreshWidget()} />
+        <Row icon="color-palette-outline" title="עיצוב והתאמת הווידג'ט" subtitle="רקע, תמונה, צבעים, מה מוצג ומה קורה כשאין משימות" chevron onPress={() => navigation.navigate('WidgetEditor')} />
+        <Row icon="refresh-outline" title="רענון הווידג'ט עכשיו" chevron onPress={() => refreshWidget()} />
       </Group>
-      <View style={styles.inlineBlock}>
-        <Text style={styles.inlineLabel}>שקיפות רקע הווידג'ט</Text>
-        <Chips
-          options={[100, 90, 75, 50, 25].map((v) => ({ value: v, label: v === 100 ? 'אטום' : `${v}%` }))}
-          value={settings.widget_opacity ?? 100}
-          onChange={(v) => updateSetting('widget_opacity', v)}
-        />
-      </View>
 
       <Text style={styles.version}>My Day · גרסה {Constants.expoConfig?.version || '1.0.0'}</Text>
 
