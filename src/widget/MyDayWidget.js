@@ -17,6 +17,7 @@ function widgetColors(p) {
     ink3: p.ink3,
     brand: p.brand,
     brandSoft: p.brandSoft,
+    onBrand: p.onBrand,
     track: p.sunken,
     line: dark ? p.line : '#F0F1F6',
   };
@@ -135,7 +136,7 @@ export function MyDayWidget({ today, items, palette, width = 320, height = 240 }
           clickActionData={{ uri: 'myday://add' }}
           style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: C.brand, alignItems: 'center', justifyContent: 'center' }}
         >
-          <SvgWidget svg={plusSvg('#FFFFFF')} style={{ width: 18, height: 18 }} />
+          <SvgWidget svg={plusSvg(C.onBrand)} style={{ width: 18, height: 18 }} />
         </FlexWidget>
         {p.total ? (
           <FlexWidget style={{ marginLeft: 8, paddingHorizontal: 10, height: 26, borderRadius: 13, backgroundColor: C.brandSoft, justifyContent: 'center' }}>

@@ -26,3 +26,13 @@ test('applyTheme updates the live tokens in place', () => {
   applyTheme('light', 'violet');
   expect(colors.bg).toBe('#F5F6FA');
 });
+
+test('a custom color from the full picker becomes the brand color', () => {
+  const p = buildPalette('light', '#12AB34');
+  expect(p.brand).toBe('#12AB34');
+  // צבע בהיר (צהוב) מקבל טקסט כהה, כהה מקבל טקסט לבן
+  expect(buildPalette('light', '#FFE600').onBrand).toBe('#15172B');
+  expect(buildPalette('light', '#1A237E').onBrand).toBe('#FFFFFF');
+  // צבע כהה מאוד מובהר במצב כהה כדי שיבלוט
+  expect(buildPalette('dark', '#1A237E').brand).not.toBe('#1A237E');
+});

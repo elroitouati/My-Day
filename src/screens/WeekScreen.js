@@ -216,7 +216,7 @@ const makeStyles = () => StyleSheet.create({
   dayNum: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   dayNumToday: { backgroundColor: colors.brand },
   dayNumText: { fontFamily: font.bold, fontSize: 15, color: colors.ink },
-  dayNumTextToday: { color: '#FFFFFF' },
+  dayNumTextToday: { color: colors.onBrand },
   count: { paddingHorizontal: 6, height: 18, borderRadius: 9, backgroundColor: colors.brandSoft, justifyContent: 'center' },
   countAll: { backgroundColor: colors.successSoft },
   countMissed: { backgroundColor: colors.missedSoft },

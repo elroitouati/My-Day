@@ -113,7 +113,7 @@ const makeStyles = () => StyleSheet.create({
   numToday: { backgroundColor: colors.brand },
   numAll: { backgroundColor: colors.successSoft },
   numText: { fontFamily: font.bold, fontSize: 15, color: colors.ink },
-  numTextToday: { color: '#FFFFFF' },
+  numTextToday: { color: colors.onBrand },
   numTextAll: { color: colors.success },
   numTextPast: { color: colors.ink2 },
   dots: { flexDirection: 'row', gap: 3, marginTop: 5 },

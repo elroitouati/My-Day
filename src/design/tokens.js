@@ -67,8 +67,27 @@ function mix(a, b, t) {
   return `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 }
 
+// ערכה מוכנה לפי שם, או צבע משלך (hex) מבוחר הצבעים המלא
 export function accentById(id) {
+  if (typeof id === 'string' && /^#[0-9A-Fa-f]{6}$/.test(id)) {
+    const hex = id.toUpperCase();
+    return {
+      id: hex,
+      name: 'צבע משלי',
+      brand: hex,
+      brandDeep: mix(hex, '#000000', 0.18),
+      // במצב כהה מבהירים מעט צבעים כהים, כדי שיבלטו על הרקע הכהה
+      brandDark: luminance(hex) < 0.25 ? mix(hex, '#FFFFFF', 0.35) : hex,
+    };
+  }
   return ACCENTS.find((a) => a.id === id) || ACCENTS[0];
+}
+
+function luminance(hex) {
+  const c = [1, 3, 5]
+    .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 }
 
 // הפלטה המלאה של ערכה — פונקציה טהורה (משמשת גם את הווידג'ט)
@@ -81,6 +100,7 @@ export function buildPalette(mode = 'light', accentId = 'violet') {
     ...base,
     brand,
     brandDeep: a.brandDeep,
+    onBrand: onColor(brand), // טקסט על צבע המותג: לבן, או כהה על צבע בהיר (צהוב וכו')
     brandSoft: dark ? mix(base.card, brand, 0.22) : mix('#FFFFFF', brand, 0.12),
     mode: dark ? 'dark' : 'light',
   };

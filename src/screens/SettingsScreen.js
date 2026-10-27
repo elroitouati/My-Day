@@ -1,5 +1,5 @@
 // הגדרות: קטגוריות, התראות, יומנים, סנכרון פנמ"צ וווידג'ט.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Linking, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -8,6 +8,7 @@ import Screen from '../components/Screen';
 import { Group, Row, Toggle, Chips, Button, Field } from '../components/controls';
 import { pickTime } from '../components/pickers';
 import CategorySheet from '../sheets/CategorySheet';
+import ColorPicker from '../components/ColorPicker';
 import { useAppState } from '../state/AppState';
 import { setSetting } from '../db/repo';
 import { afterChange } from '../services/actions';
@@ -136,6 +137,16 @@ export default function SettingsScreen() {
 function AppearanceSection() {
   const styles = useStyles(makeStyles);
   const { mode, accent, tabStyle, setTheme } = useTheme();
+  const isCustom = accent.startsWith('#');
+  const [customOpen, setCustomOpen] = useState(isCustom);
+  const [custom, setCustom] = useState(isCustom ? accent : '#6C5CFF');
+  const debounce = useRef(null);
+  // בגרירה בבוחר הצבעים מעדכנים את האפליקציה אחרי עצירה קצרה, לא בכל תזוזה
+  const pickCustom = (hex) => {
+    setCustom(hex);
+    clearTimeout(debounce.current);
+    debounce.current = setTimeout(() => change({ accent: hex }), 250);
+  };
   const change = (patch) => {
     Haptics.selectionAsync().catch(() => {});
     setTheme(patch);
@@ -187,7 +198,23 @@ function AppearanceSection() {
               </Pressable>
             );
           })}
+          <Pressable
+            onPress={() => {
+              setCustomOpen(true);
+              change({ accent: custom });
+            }}
+            style={styles.accentItem}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: isCustom }}
+            accessibilityLabel="צבע משלי"
+          >
+            <View style={[styles.accentDot, styles.customDot, isCustom && { backgroundColor: custom, borderColor: colors.ink }]}>
+              <Ionicons name={isCustom ? 'checkmark' : 'color-palette'} size={20} color={isCustom ? '#FFFFFF' : colors.ink2} />
+            </View>
+            <Text style={[styles.accentName, isCustom && styles.accentNameOn]}>צבע משלי</Text>
+          </Pressable>
         </View>
+        {customOpen && isCustom ? <ColorPicker value={custom} onChange={pickCustom} allowNone={false} /> : null}
 
         <Text style={styles.subLabel}>סרגל הכפתורים למטה</Text>
         <Chips options={TAB_STYLES.map((t) => ({ value: t.id, label: t.name }))} value={tabStyle} onChange={(v) => change({ tabStyle: v })} />
@@ -296,6 +323,7 @@ const makeStyles = () => StyleSheet.create({
   accents: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   accentItem: { alignItems: 'center', gap: 4, minWidth: 48 },
   accentDot: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'transparent' },
+  customDot: { backgroundColor: colors.sunken, borderColor: colors.line },
   accentName: { ...text.caption },
   accentNameOn: { color: colors.ink, fontFamily: font.bold },
   inlineLabel: { ...text.caption, fontFamily: font.bold, color: colors.ink2, paddingHorizontal: space[2], textAlign: 'left' },

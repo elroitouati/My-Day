@@ -3,7 +3,7 @@ import React from 'react';
 import { View, Text, Pressable, TextInput, Switch, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { colors, radius, shadow, space, text, font } from '../design/tokens';
+import { colors, radius, shadow, space, text, font, onColor } from '../design/tokens';
 import { HEB_WEEKDAYS_LETTER } from '../logic/dates';
 import { useStyles } from '../state/Theme';
 
@@ -72,7 +72,7 @@ export function Chips({ options, value, onChange, colorFor }) {
             style={[styles.chip, active && { backgroundColor: c, borderColor: c }]}
           >
             {own && !active ? <View style={[styles.dot, { backgroundColor: own }]} /> : null}
-            <Text style={[styles.chipText, active && styles.chipTextActive]}>{o.label}</Text>
+            <Text style={[styles.chipText, active && styles.chipTextActive, active && { color: onColor(c) }]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -241,7 +241,7 @@ const makeStyles = () => StyleSheet.create({
   },
   dayOn: { backgroundColor: colors.brand, borderColor: colors.brand },
   dayText: { fontFamily: font.bold, fontSize: 15, color: colors.ink2 },
-  dayTextOn: { color: '#FFFFFF' },
+  dayTextOn: { color: colors.onBrand },
   stepper: {
     flexDirection: 'row',
     alignItems: 'center',
