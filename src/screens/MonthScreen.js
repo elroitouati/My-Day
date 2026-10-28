@@ -1,18 +1,44 @@
-// חודש: לוח שנה עם נקודות צבעוניות לפי קטגוריות. לחיצה על יום פותחת אותו.
-import React, { useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { Ionicons } from '@expo/vector-icons';
-import Screen from '../components/Screen';
-import { useAppState, useRange } from '../state/AppState';
-import { buildMonthGrid, monthLabel, keyToDate, HEB_WEEKDAYS_LETTER, dayKey } from '../logic/dates';
-import { progress } from '../logic/dayItems';
-import { colors, radius, shadow, space, text, font, fs } from '../design/tokens';
-import { useStyles } from '../state/Theme';
-import { motion } from '../design/feedback';
+// חודש: לוח בסגנון יומן — בכל יום רואים בקצרה מה יש בו. לחיצה על יום פותחת אותו.
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+} from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { Ionicons } from "@expo/vector-icons";
+import Screen from "../components/Screen";
+import { useAppState, useRange } from "../state/AppState";
+import {
+  buildMonthGrid,
+  monthLabel,
+  keyToDate,
+  HEB_WEEKDAYS_LETTER,
+  dayKey,
+} from "../logic/dates";
+import { progress } from "../logic/dayItems";
+import { monthChips } from "../logic/monthChips";
+import {
+  colors,
+  radius,
+  shadow,
+  space,
+  text,
+  font,
+  fs,
+  onColor,
+} from "../design/tokens";
+import { useStyles } from "../state/Theme";
+import { motion } from "../design/feedback";
+
+const CHIP_H = 17; // גובה שורת צ'יפ
+const HEAD_H = 28; // מספר היום
 
 export default function MonthScreen({ navigation }) {
   const styles = useStyles(makeStyles);
+  const { height } = useWindowDimensions();
   const { today } = useAppState();
   const t = keyToDate(today);
   const [ym, setYm] = useState({ y: t.getFullYear(), m: t.getMonth() });
@@ -25,104 +51,261 @@ export default function MonthScreen({ navigation }) {
     setYm({ y: d.getFullYear(), m: d.getMonth() });
   };
   const isCurrent = ym.y === t.getFullYear() && ym.m === t.getMonth();
+  // הלוח ממלא את המסך: גובה התא נגזר מגובה המסך ומספר השבועות
+  const cellH = Math.max(86, Math.floor((height - 330) / grid.length));
+  const capacity = Math.max(2, Math.floor((cellH - HEAD_H - 4) / (CHIP_H + 2)));
 
   return (
     <Screen
       eyebrow="חודש"
       title={monthLabel(ym.y, ym.m)}
+      bottomPad={110}
       action={
         <View style={styles.nav}>
-          <Pressable style={styles.navBtn} onPress={() => move(-1)} accessibilityLabel="החודש הקודם">
+          <Pressable
+            style={styles.navBtn}
+            onPress={() => move(-1)}
+            accessibilityLabel="החודש הקודם"
+          >
             <Ionicons name="chevron-forward" size={20} color={colors.ink} />
           </Pressable>
           {!isCurrent ? (
-            <Pressable style={[styles.navBtn, styles.todayBtn]} onPress={() => setYm({ y: t.getFullYear(), m: t.getMonth() })}>
+            <Pressable
+              style={[styles.navBtn, styles.todayBtn]}
+              onPress={() => setYm({ y: t.getFullYear(), m: t.getMonth() })}
+            >
               <Text style={styles.todayText}>היום</Text>
             </Pressable>
           ) : null}
-          <Pressable style={styles.navBtn} onPress={() => move(1)} accessibilityLabel="החודש הבא">
+          <Pressable
+            style={styles.navBtn}
+            onPress={() => move(1)}
+            accessibilityLabel="החודש הבא"
+          >
             <Ionicons name="chevron-back" size={20} color={colors.ink} />
           </Pressable>
         </View>
       }
     >
-      <Animated.View key={`${ym.y}-${ym.m}`} entering={motion(FadeIn.duration(250))} style={styles.card}>
+      <Animated.View
+        key={`${ym.y}-${ym.m}`}
+        entering={motion(FadeIn.duration(250))}
+        style={styles.card}
+      >
         <View style={styles.week}>
-          {HEB_WEEKDAYS_LETTER.map((l) => (
-            <Text key={l} style={styles.weekday}>{l}</Text>
+          {HEB_WEEKDAYS_LETTER.map((l, i) => (
+            <Text
+              key={l}
+              style={[styles.weekday, i === 6 && styles.weekdayShabbat]}
+            >
+              {l}
+            </Text>
           ))}
         </View>
         {grid.map((week, wi) => (
-          <View key={wi} style={styles.week}>
+          <View key={wi} style={[styles.week, wi > 0 && styles.weekLine]}>
             {week.map((k, di) => {
-              if (!k) return <View key={di} style={styles.cell} />;
+              if (!k)
+                return (
+                  <View key={di} style={[styles.cell, { height: cellH }]} />
+                );
               const items = byDate[k] || [];
               const p = progress(items);
-              const dots = [...new Set(items.map((i) => i.color))].slice(0, 4);
+              const { chips, more } = monthChips(items, capacity);
               const isToday = k === today;
+              const past = k < today;
               const all = p.total > 0 && p.done === p.total;
-              const missed = items.some((i) => i.missed); // רק פנמ"צ
               return (
                 <Pressable
                   key={k}
-                  style={({ pressed }) => [styles.cell, pressed && styles.cellPressed]}
-                  onPress={() => navigation.navigate('Day', { date: k })}
+                  style={({ pressed }) => [
+                    styles.cell,
+                    { height: cellH },
+                    di === 6 && styles.cellShabbat,
+                    all && styles.cellAll,
+                    isToday && styles.cellToday,
+                    pressed && styles.cellPressed,
+                  ]}
+                  onPress={() => navigation.navigate("Day", { date: k })}
                   accessibilityLabel={`${keyToDate(k).getDate()}, ${p.total} משימות`}
                 >
-                  <View style={[styles.num, isToday && styles.numToday, all && !isToday && styles.numAll]}>
-                    <Text style={[styles.numText, isToday && styles.numTextToday, all && !isToday && styles.numTextAll, k < today && !all && styles.numTextPast]}>
-                      {keyToDate(k).getDate()}
-                    </Text>
+                  <View style={styles.head}>
+                    <View style={[styles.num, isToday && styles.numToday]}>
+                      <Text
+                        style={[
+                          styles.numText,
+                          isToday && styles.numTextToday,
+                          past && !isToday && styles.numTextPast,
+                        ]}
+                      >
+                        {keyToDate(k).getDate()}
+                      </Text>
+                    </View>
+                    {all ? (
+                      <Ionicons
+                        name="checkmark-circle"
+                        size={13}
+                        color={colors.success}
+                      />
+                    ) : null}
                   </View>
-                  <View style={styles.dots}>
-                    {dots.map((c) => (
-                      <View key={c} style={[styles.dot, { backgroundColor: c }]} />
-                    ))}
-                  </View>
-                  {missed ? <View style={styles.missedMark} /> : null}
+                  {chips.map((c) =>
+                    c.kind === "fill" ? (
+                      <View
+                        key={c.key}
+                        style={[
+                          styles.chip,
+                          styles.chipFill,
+                          { backgroundColor: c.color },
+                          c.done && styles.chipDone,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.chipText,
+                            styles.chipFillText,
+                            { color: onColor(c.color) },
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="clip"
+                        >
+                          {c.title}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View
+                        key={c.key}
+                        style={[
+                          styles.chip,
+                          c.missed && styles.chipMissed,
+                          c.done && styles.chipDone,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.chipBar,
+                            {
+                              backgroundColor: c.missed
+                                ? colors.missed
+                                : c.color,
+                            },
+                          ]}
+                        />
+                        <Text
+                          style={[
+                            styles.chipText,
+                            c.done && styles.chipTextDone,
+                          ]}
+                          numberOfLines={1}
+                          ellipsizeMode="clip"
+                        >
+                          {c.title}
+                        </Text>
+                      </View>
+                    ),
+                  )}
+                  {more ? <Text style={styles.more}>+{more}</Text> : null}
                 </Pressable>
               );
             })}
           </View>
         ))}
       </Animated.View>
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, styles.numAll]} />
-          <Text style={styles.legendText}>הכל הושלם</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendSwatch, styles.legendMissed]} />
-          <Text style={styles.legendText}>פספוס אימון פנמ"צ</Text>
-        </View>
-      </View>
     </Screen>
   );
 }
 
-const makeStyles = () => StyleSheet.create({
-  nav: { flexDirection: 'row', gap: 6 },
-  navBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', ...shadow.card },
-  todayBtn: { width: undefined, paddingHorizontal: 12 },
-  todayText: { fontFamily: font.bold, fontSize: fs(13), color: colors.brand },
-  card: { backgroundColor: colors.card, borderRadius: radius.card, padding: space[2], ...shadow.card },
-  week: { flexDirection: 'row' },
-  weekday: { flex: 1, textAlign: 'center', ...text.caption, fontFamily: font.bold, paddingVertical: space[2] },
-  cell: { flex: 1, height: 62, alignItems: 'center', paddingTop: 4, borderRadius: 14 },
-  cellPressed: { backgroundColor: colors.sunken },
-  num: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  numToday: { backgroundColor: colors.brand },
-  numAll: { backgroundColor: colors.successSoft },
-  numText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink },
-  numTextToday: { color: colors.onBrand },
-  numTextAll: { color: colors.success },
-  numTextPast: { color: colors.ink2 },
-  dots: { flexDirection: 'row', gap: 3, marginTop: 5 },
-  dot: { width: 6, height: 6, borderRadius: 3 },
-  missedMark: { position: 'absolute', top: 6, end: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.missed },
-  legend: { flexDirection: 'row', gap: space[4], paddingHorizontal: space[2] },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendSwatch: { width: 14, height: 14, borderRadius: 7 },
-  legendMissed: { backgroundColor: colors.missed, width: 8, height: 8, borderRadius: 4 },
-  legendText: { ...text.caption },
-});
+const makeStyles = () =>
+  StyleSheet.create({
+    nav: { flexDirection: "row", gap: 6 },
+    navBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: colors.card,
+      alignItems: "center",
+      justifyContent: "center",
+      ...shadow.card,
+    },
+    todayBtn: { width: undefined, paddingHorizontal: 12 },
+    todayText: { fontFamily: font.bold, fontSize: fs(13), color: colors.brand },
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: radius.card,
+      paddingHorizontal: 4,
+      paddingBottom: 4,
+      overflow: "hidden",
+      ...shadow.card,
+    },
+    week: { flexDirection: "row" },
+    weekLine: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.line,
+    },
+    weekday: {
+      flex: 1,
+      textAlign: "center",
+      ...text.caption,
+      fontFamily: font.bold,
+      paddingVertical: space[2],
+    },
+    weekdayShabbat: { color: colors.brand },
+    cell: {
+      flex: 1,
+      paddingHorizontal: 2,
+      paddingTop: 3,
+      borderRadius: 10,
+      overflow: "hidden",
+    },
+    cellShabbat: { backgroundColor: colors.sunken },
+    cellAll: { backgroundColor: colors.successSoft },
+    cellToday: { borderWidth: 1.5, borderColor: colors.brand },
+    cellPressed: { opacity: 0.6 },
+    head: {
+      height: HEAD_H,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 1,
+    },
+    num: {
+      minWidth: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 3,
+    },
+    numToday: { backgroundColor: colors.brand },
+    numText: { fontFamily: font.bold, fontSize: fs(13), color: colors.ink },
+    numTextToday: { color: colors.onBrand },
+    numTextPast: { color: colors.ink3 },
+    chip: {
+      height: CHIP_H,
+      marginBottom: 2,
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 4,
+      overflow: "hidden",
+    },
+    chipFill: { paddingHorizontal: 3 },
+    chipBar: { width: 3, alignSelf: "stretch", borderRadius: 2, marginEnd: 2 },
+    chipMissed: { backgroundColor: colors.missedSoft },
+    chipDone: { opacity: 0.45 },
+    chipText: {
+      flex: 1,
+      fontFamily: font.medium,
+      fontSize: fs(10.5),
+      lineHeight: CHIP_H - 1,
+      color: colors.ink,
+      textAlign: "left",
+    },
+    chipFillText: { fontFamily: font.bold },
+    chipTextDone: { textDecorationLine: "line-through" },
+    more: {
+      fontFamily: font.bold,
+      fontSize: fs(10),
+      color: colors.ink2,
+      paddingHorizontal: 2,
+    },
+  });
