@@ -28,6 +28,9 @@ export const WIDGET_DEFAULTS = {
   fit: 'fill', // fill — ממלא את כל המקום | content — מתכווץ לגובה התוכן
   whenEmpty: 'message', // message | hide | tomorrow
   whenAllDone: 'message', // message | hide | tomorrow
+  // משוב בסימון V
+  haptic: true,
+  sound: false,
 };
 
 export function widgetPrefs(settings = {}) {

@@ -3,7 +3,7 @@
     "name": "My Day",
     "slug": "my-day",
     "owner": "elroi_touati",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "myday",
@@ -31,6 +31,9 @@
         "android.permission.USE_EXACT_ALARM",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -39,6 +42,12 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#6C5CFF"
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": false
         }
       ],
       [
