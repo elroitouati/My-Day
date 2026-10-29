@@ -1,4 +1,4 @@
-// הגדרות: קטגוריות, התראות, יומנים, סנכרון פנמ"צ וווידג'ט.
+// הגדרות: מסך ראשי עם קטגוריות, וכל קטגוריה במסך משלה.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Linking, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,23 +26,100 @@ import WhatsNewSheet from '../sheets/WhatsNewSheet';
 import TaskCard, { IMPORTANT_STYLES } from '../components/TaskCard';
 import { checkForUpdate, applyUpdate, currentBuildDate, updatesEnabled, useUpdateState } from '../services/useUpdates';
 
+// מסך ההגדרות הראשי: רשימת קטגוריות מסודרת. כל קטגוריה נפתחת במסך משלה (SettingsDetail).
+const SECTIONS = {
+  appearance: { title: 'מראה', icon: 'color-palette-outline', color: '#8B5CF6' },
+  behavior: { title: 'התנהגות הרשימה', icon: 'list-outline', color: '#14B8A6' },
+  widget: { title: "ווידג'ט", icon: 'apps-outline', color: '#FF8A00' },
+  categories: { title: 'קטגוריות', icon: 'pricetags-outline', color: '#FF4FBF' },
+  notifications: { title: 'התראות ותזכורות', icon: 'notifications-outline', color: '#FF4D6D' },
+  calendar: { title: 'יומן Google', icon: 'calendar-outline', color: '#3A86FF' },
+  panmatz: { title: 'סנכרון פנמ"צ', icon: 'barbell-outline', color: PANMATZ_CATEGORY.color },
+  updates: { title: 'עדכונים ואודות', icon: 'information-circle-outline', color: '#5B6078' },
+};
+
 export default function SettingsScreen({ navigation }) {
-  const styles = useStyles(makeStyles);
-  const { categories, settings, updateSetting } = useAppState();
+  const { categories, settings, user } = useAppState();
+  const { mode, accent } = useTheme();
+  if (!settings) return null;
+  const open = (section) => navigation.navigate('SettingsDetail', { section });
+  const item = (key, subtitle) => (
+    <Row
+      key={key}
+      icon={SECTIONS[key].icon}
+      iconColor={SECTIONS[key].color}
+      title={SECTIONS[key].title}
+      subtitle={subtitle}
+      chevron
+      onPress={() => open(key)}
+    />
+  );
+  const accentName = accent.startsWith('#') ? 'צבע משלי' : ACCENTS.find((a) => a.id === accent)?.name;
+  const panmatzOn = settings.panmatzEnabled ?? !!user;
+  return (
+    <Screen eyebrow="My Day" title="הגדרות">
+      <Group title="התאמה אישית">
+        {item('appearance', `${mode === 'dark' ? 'כהה' : 'בהיר'} · ${accentName || ''}`)}
+        {item('behavior', 'סדר, משימות שבוצעו, מסך פתיחה')}
+        {item('widget', 'עיצוב, תוכן ורענון')}
+      </Group>
+      <Group title="משימות ותזכורות">
+        {item('categories', `${categories.length} קטגוריות`)}
+        {item('notifications', settings.notificationsEnabled ? 'פועלות' : 'כבויות')}
+      </Group>
+      <Group title="חיבורים">
+        {item('calendar', settings.calendarEnabled ? 'מחובר' : 'כבוי')}
+        {item('panmatz', !panmatzOn ? 'כבוי' : user ? 'מחובר' : 'לא מחובר')}
+      </Group>
+      <Group title="כללי">{item('updates', `גרסה ${Constants.expoConfig?.version || '1.0.0'}`)}</Group>
+    </Screen>
+  );
+}
+
+export function SettingsDetailScreen({ route, navigation }) {
+  const { section } = route.params;
+  const Body = {
+    appearance: AppearanceSection,
+    behavior: BehaviorSection,
+    widget: WidgetSection,
+    categories: CategoriesSection,
+    notifications: NotificationsSection,
+    calendar: CalendarSection,
+    panmatz: PanmatzSection,
+    updates: UpdatesSection,
+  }[section];
+  return (
+    <Screen eyebrow="הגדרות" title={SECTIONS[section].title} onBack={() => navigation.goBack()}>
+      <Body navigation={navigation} />
+    </Screen>
+  );
+}
+
+function CategoriesSection() {
+  const { categories } = useAppState();
   const [editCat, setEditCat] = useState(null);
+  return (
+    <>
+      <Group footer="לחיצה על קטגוריה משנה את השם או הצבע שלה.">
+        {categories.map((c) => (
+          <Row key={c.id} icon="pricetag" iconColor={c.color || UNCATEGORIZED.color} title={c.name} chevron onPress={() => setEditCat(c)} />
+        ))}
+        <Row icon="add" title="קטגוריה חדשה" onPress={() => setEditCat({ name: '', color: null })} />
+      </Group>
+      <CategorySheet category={editCat} onClose={() => setEditCat(null)} />
+    </>
+  );
+}
+
+function NotificationsSection() {
+  const styles = useStyles(makeStyles);
+  const { settings, updateSetting } = useAppState();
   const [notifPerm, setNotifPerm] = useState(null);
-  const [calendars, setCalendars] = useState([]);
-
-  const loadPerms = useCallback(async () => {
-    setNotifPerm(await notificationPermission().catch(() => null));
-    if (settings?.calendarEnabled && (await hasCalendarPermission())) {
-      setCalendars(await listCalendars().catch(() => []));
-    }
-  }, [settings?.calendarEnabled]);
   useEffect(() => {
-    loadPerms();
-  }, [loadPerms]);
-
+    notificationPermission()
+      .catch(() => null)
+      .then(setNotifPerm);
+  }, []);
   if (!settings) return null;
 
   const toggleNotifications = async (v) => {
@@ -53,6 +130,87 @@ export default function SettingsScreen({ navigation }) {
     }
     await updateSetting('notificationsEnabled', v);
   };
+
+  return (
+    <>
+      <Group
+        title="התראות"
+        footer={notifPerm && !notifPerm.granted && settings.notificationsEnabled ? 'ההתראות חסומות בהגדרות הטלפון. לחץ על "פתיחת הגדרות" כדי לאשר.' : null}
+      >
+        <Row
+          icon="notifications-outline"
+          title="התראות"
+          trailing={<Toggle value={!!settings.notificationsEnabled && !!notifPerm?.granted} onValueChange={toggleNotifications} />}
+        />
+        {notifPerm && !notifPerm.granted ? <Row icon="open-outline" title="פתיחת הגדרות הטלפון" chevron onPress={() => Linking.openSettings()} /> : null}
+      </Group>
+
+      <View style={styles.inlineBlock}>
+        <Text style={styles.inlineLabel}>תזכורת ברירת מחדל למשימה עם שעה</Text>
+        <Chips options={REMINDER_OPTIONS} value={settings.defaultReminder} onChange={(v) => updateSetting('defaultReminder', v)} />
+      </View>
+
+      <Group title="תזכורות יומיות">
+        <Row
+          icon="sunny-outline"
+          title="תזכורת בוקר"
+          subtitle="כמה משימות מחכות לך היום"
+          trailing={<Toggle value={!!settings.morningEnabled} onValueChange={(v) => updateSetting('morningEnabled', v)} />}
+        />
+        {settings.morningEnabled ? (
+          <Row
+            title="שעת תזכורת הבוקר"
+            value={settings.morningTime}
+            chevron
+            onPress={() => pickTime(settings.morningTime, (t) => updateSetting('morningTime', t))}
+          />
+        ) : null}
+        <Row
+          icon="moon-outline"
+          title="תזכורת ערב"
+          subtitle="רק אם נשארו משימות פתוחות"
+          trailing={<Toggle value={!!settings.eveningEnabled} onValueChange={(v) => updateSetting('eveningEnabled', v)} />}
+        />
+        {settings.eveningEnabled ? (
+          <Row
+            title="שעת תזכורת הערב"
+            value={settings.eveningTime}
+            chevron
+            onPress={() => pickTime(settings.eveningTime, (t) => updateSetting('eveningTime', t))}
+          />
+        ) : null}
+      </Group>
+
+      <Group title="שעות שקט" footer="בשעות השקט לא נשלחות התראות בכלל. שבת: משישי 16:00 עד מוצאי שבת 20:00.">
+        <Row icon="moon" title="שעות שקט" trailing={<Toggle value={!!settings.quietEnabled} onValueChange={(v) => updateSetting('quietEnabled', v)} />} />
+        {settings.quietEnabled ? (
+          <Row title="מ-" value={settings.quietFrom} chevron onPress={() => pickTime(settings.quietFrom, (t) => updateSetting('quietFrom', t))} />
+        ) : null}
+        {settings.quietEnabled ? (
+          <Row title="עד" value={settings.quietTo} chevron onPress={() => pickTime(settings.quietTo, (t) => updateSetting('quietTo', t))} />
+        ) : null}
+        <Row
+          icon="flame-outline"
+          title="בלי התראות בשבת"
+          trailing={<Toggle value={!!settings.quietShabbat} onValueChange={(v) => updateSetting('quietShabbat', v)} />}
+        />
+      </Group>
+    </>
+  );
+}
+
+function CalendarSection() {
+  const { settings } = useAppState();
+  const [calendars, setCalendars] = useState([]);
+  const loadCalendars = useCallback(async () => {
+    if (settings?.calendarEnabled && (await hasCalendarPermission())) {
+      setCalendars(await listCalendars().catch(() => []));
+    }
+  }, [settings?.calendarEnabled]);
+  useEffect(() => {
+    loadCalendars();
+  }, [loadCalendars]);
+  if (!settings) return null;
 
   const toggleCalendar = async (v) => {
     if (!v) {
@@ -81,115 +239,41 @@ export default function SettingsScreen({ navigation }) {
   };
 
   return (
-    <Screen eyebrow="My Day" title="הגדרות">
-      <AppearanceSection />
+    <Group footer="קריאה בלבד מהיומנים שמסונכרנים לטלפון. סימון V נשמר רק כאן ולא נכתב ליומן.">
+      <Row
+        icon="calendar-outline"
+        iconColor="#4C8DFF"
+        title="הצגת אירועים מהיומן"
+        trailing={<Toggle value={!!settings.calendarEnabled} onValueChange={toggleCalendar} />}
+      />
+      {settings.calendarEnabled
+        ? calendars.map((c) => (
+            <Row
+              key={c.id}
+              icon="ellipse"
+              iconColor={c.color}
+              title={c.title}
+              subtitle={c.account}
+              trailing={<Toggle value={selectedIds.includes(c.id)} onValueChange={(v) => toggleCal(c.id, v)} />}
+            />
+          ))
+        : null}
+    </Group>
+  );
+}
 
-      <Group title="קטגוריות">
-        {categories.map((c) => (
-          <Row key={c.id} icon="pricetag" iconColor={c.color || UNCATEGORIZED.color} title={c.name} chevron onPress={() => setEditCat(c)} />
-        ))}
-        <Row icon="add" title="קטגוריה חדשה" onPress={() => setEditCat({ name: '', color: null })} />
-      </Group>
-
-      <Group
-        title="התראות"
-        footer={notifPerm && !notifPerm.granted && settings.notificationsEnabled ? 'ההתראות חסומות בהגדרות הטלפון. לחץ על "פתיחת הגדרות" כדי לאשר.' : null}
-      >
-        <Row
-          icon="notifications-outline"
-          title="התראות"
-          trailing={<Toggle value={!!settings.notificationsEnabled && !!notifPerm?.granted} onValueChange={toggleNotifications} />}
-        />
-        {notifPerm && !notifPerm.granted ? <Row icon="open-outline" title="פתיחת הגדרות הטלפון" chevron onPress={() => Linking.openSettings()} /> : null}
-        <Row
-          icon="moon-outline"
-          title="תזכורת ערב"
-          subtitle="רק אם נשארו משימות פתוחות"
-          trailing={<Toggle value={!!settings.eveningEnabled} onValueChange={(v) => updateSetting('eveningEnabled', v)} />}
-        />
-        {settings.eveningEnabled ? (
-          <Row
-            title="שעת תזכורת הערב"
-            value={settings.eveningTime}
-            chevron
-            onPress={() => pickTime(settings.eveningTime, (t) => updateSetting('eveningTime', t))}
-          />
-        ) : null}
-        <Row
-          icon="sunny-outline"
-          title="תזכורת בוקר"
-          subtitle="כמה משימות מחכות לך היום"
-          trailing={<Toggle value={!!settings.morningEnabled} onValueChange={(v) => updateSetting('morningEnabled', v)} />}
-        />
-        {settings.morningEnabled ? (
-          <Row
-            title="שעת תזכורת הבוקר"
-            value={settings.morningTime}
-            chevron
-            onPress={() => pickTime(settings.morningTime, (t) => updateSetting('morningTime', t))}
-          />
-        ) : null}
-      </Group>
-
-      <Group title="שעות שקט" footer="בשעות השקט לא נשלחות התראות בכלל. שבת: משישי 16:00 עד מוצאי שבת 20:00.">
-        <Row icon="moon" title="שעות שקט" trailing={<Toggle value={!!settings.quietEnabled} onValueChange={(v) => updateSetting('quietEnabled', v)} />} />
-        {settings.quietEnabled ? (
-          <Row title="מ-" value={settings.quietFrom} chevron onPress={() => pickTime(settings.quietFrom, (t) => updateSetting('quietFrom', t))} />
-        ) : null}
-        {settings.quietEnabled ? (
-          <Row title="עד" value={settings.quietTo} chevron onPress={() => pickTime(settings.quietTo, (t) => updateSetting('quietTo', t))} />
-        ) : null}
-        <Row
-          icon="flame-outline"
-          title="בלי התראות בשבת"
-          trailing={<Toggle value={!!settings.quietShabbat} onValueChange={(v) => updateSetting('quietShabbat', v)} />}
-        />
-      </Group>
-
-      <BehaviorSection />
-      <View style={styles.inlineBlock}>
-        <Text style={styles.inlineLabel}>תזכורת ברירת מחדל למשימה עם שעה</Text>
-        <Chips options={REMINDER_OPTIONS} value={settings.defaultReminder} onChange={(v) => updateSetting('defaultReminder', v)} />
-      </View>
-
-      <Group title="יומן Google" footer="קריאה בלבד מהיומנים שמסונכרנים לטלפון. סימון V נשמר רק כאן ולא נכתב ליומן.">
-        <Row
-          icon="calendar-outline"
-          iconColor="#4C8DFF"
-          title="הצגת אירועים מהיומן"
-          trailing={<Toggle value={!!settings.calendarEnabled} onValueChange={toggleCalendar} />}
-        />
-        {settings.calendarEnabled
-          ? calendars.map((c) => (
-              <Row
-                key={c.id}
-                icon="ellipse"
-                iconColor={c.color}
-                title={c.title}
-                subtitle={c.account}
-                trailing={<Toggle value={selectedIds.includes(c.id)} onValueChange={(v) => toggleCal(c.id, v)} />}
-              />
-            ))
-          : null}
-      </Group>
-
-      <PanmatzSection />
-
-      <Group title="ווידג'ט" footer="לחיצה ארוכה על מסך הבית ← ווידג'טים ← My Day. הווידג'ט מתעדכן לבד, וגם בכל פתיחה של האפליקציה.">
-        <Row
-          icon="color-palette-outline"
-          title="עיצוב והתאמת הווידג'ט"
-          subtitle="רקע, תמונה, צבעים, מה מוצג ומה קורה כשאין משימות"
-          chevron
-          onPress={() => navigation.navigate('WidgetEditor')}
-        />
-        <Row icon="refresh-outline" title="רענון הווידג'ט עכשיו" chevron onPress={() => refreshWidget()} />
-      </Group>
-
-      <UpdatesSection />
-
-      <CategorySheet category={editCat} onClose={() => setEditCat(null)} />
-    </Screen>
+function WidgetSection({ navigation }) {
+  return (
+    <Group footer="להוספה: לחיצה ארוכה על מסך הבית ← ווידג'טים ← My Day. הווידג'ט מתעדכן לבד, וגם בכל פתיחה של האפליקציה.">
+      <Row
+        icon="color-palette-outline"
+        title="עיצוב והתאמת הווידג'ט"
+        subtitle="רקע, תמונה, צבעים, מה מוצג ומה קורה כשאין משימות"
+        chevron
+        onPress={() => navigation.navigate('WidgetEditor')}
+      />
+      <Row icon="refresh-outline" title="רענון הווידג'ט עכשיו" chevron onPress={() => refreshWidget()} />
+    </Group>
   );
 }
 
@@ -199,7 +283,6 @@ function BehaviorSection() {
   const { doneItems, sortMode, startTab, motion: motionOn, haptics, setTheme } = useTheme();
   return (
     <View style={styles.inlineBlock}>
-      <Text style={styles.inlineLabel}>הרשימה והתנהגות</Text>
       <View style={styles.appearance}>
         <Text style={styles.subLabel}>משימות שבוצעו</Text>
         <Chips
@@ -260,7 +343,6 @@ function AppearanceSection() {
   };
   return (
     <View style={styles.inlineBlock}>
-      <Text style={styles.inlineLabel}>מראה</Text>
       <View style={styles.appearance}>
         <View style={styles.modeRow}>
           {[
@@ -420,7 +502,7 @@ function PanmatzAccount() {
     const err = getLastSyncError();
     return (
       <Group
-        title='סנכרון פנמ"צ'
+        title="חשבון"
         footer={msg?.text || (err ? `הסנכרון האחרון נכשל: ${authErrorText(err)}` : 'אימונים ומטרות מפנמ"צ מופיעים כאן, וסימון בכל צד מתעדכן בשני.')}
       >
         <Row icon="cloud-done-outline" iconColor={PANMATZ_CATEGORY.color} title="מחובר" subtitle={user.email} />
@@ -456,7 +538,7 @@ function PanmatzAccount() {
 
   return (
     <View style={styles.inlineBlock}>
-      <Text style={styles.inlineLabel}>סנכרון פנמ"צ</Text>
+      <Text style={styles.inlineLabel}>חשבון</Text>
       <View style={styles.authCard}>
         <Text style={styles.authHint}>התחבר עם אותו חשבון שבו התחברת בפנמ"צ.</Text>
         <Field value={email} onChangeText={setEmail} placeholder="אימייל" keyboardType="email-address" autoCapitalize="none" autoComplete="email" />
@@ -523,7 +605,7 @@ function UpdatesSection() {
   const busy = status === 'checking' || status === 'downloading';
   return (
     <>
-      <Group title="עדכונים" footer="עדכונים נבדקים לבד בכל פתיחה וגם ברקע. כשיש עדכון חדש מקבלים התראה.">
+      <Group footer="עדכונים נבדקים לבד בכל פתיחה וגם ברקע. כשיש עדכון חדש מקבלים התראה.">
         <Row icon="information-circle-outline" title={`My Day · גרסה ${Constants.expoConfig?.version || '1.0.0'}`} subtitle={builtText} />
         <Row
           icon={status === 'ready' ? 'sparkles' : 'cloud-download-outline'}

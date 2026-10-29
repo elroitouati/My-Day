@@ -22,7 +22,7 @@ import TaskSheet from './src/sheets/TaskSheet';
 import TodayScreen from './src/screens/TodayScreen';
 import WeekScreen from './src/screens/WeekScreen';
 import MonthScreen from './src/screens/MonthScreen';
-import SettingsScreen from './src/screens/SettingsScreen';
+import SettingsScreen, { SettingsDetailScreen } from './src/screens/SettingsScreen';
 import DayScreen from './src/screens/DayScreen';
 import WidgetEditorScreen from './src/screens/WidgetEditorScreen';
 import UpdateBanner from './src/components/UpdateBanner';
@@ -166,6 +166,7 @@ function Root({ onReady }) {
                 <Stack.Screen name="Tabs" component={Tabs} />
                 <Stack.Screen name="Day" component={DayScreen} options={{ animation: 'slide_from_left' }} />
                 <Stack.Screen name="WidgetEditor" component={WidgetEditorScreen} options={{ animation: 'slide_from_left' }} />
+                <Stack.Screen name="SettingsDetail" component={SettingsDetailScreen} options={{ animation: 'slide_from_left' }} />
               </Stack.Navigator>
             </NavigationContainer>
             <TaskSheet />
