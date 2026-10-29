@@ -1,6 +1,6 @@
 // הגדרות: קטגוריות, התראות, יומנים, סנכרון פנמ"צ וווידג'ט.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, Linking, StyleSheet, ActivityIndicator, Pressable, AppState } from 'react-native';
+import { View, Text, Linking, StyleSheet, ActivityIndicator, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import Screen from '../components/Screen';
@@ -24,17 +24,6 @@ import { useStyles, useTheme } from '../state/Theme';
 import { haptic } from '../design/feedback';
 import WhatsNewSheet from '../sheets/WhatsNewSheet';
 import TaskCard, { IMPORTANT_STYLES } from '../components/TaskCard';
-import {
-  alarmsAvailable,
-  testAlarm,
-  canUseFullScreen,
-  openFullScreenSettings,
-  canScheduleExact,
-  openExactSettings,
-  getAlarmSound,
-  pickAlarmSound,
-  resetAlarmSound,
-} from '../services/alarms';
 import { checkForUpdate, applyUpdate, currentBuildDate, updatesEnabled, useUpdateState } from '../services/useUpdates';
 
 export default function SettingsScreen({ navigation }) {
@@ -141,8 +130,6 @@ export default function SettingsScreen({ navigation }) {
           />
         ) : null}
       </Group>
-
-      <ImportantAlarmsSection />
 
       <Group title="שעות שקט" footer="בשעות השקט לא נשלחות התראות בכלל. שבת: משישי 16:00 עד מוצאי שבת 20:00.">
         <Row icon="moon" title="שעות שקט" trailing={<Toggle value={!!settings.quietEnabled} onValueChange={(v) => updateSetting('quietEnabled', v)} />} />
@@ -515,59 +502,7 @@ const PREVIEW_IMPORTANT = {
   color: '#3A86FF',
   important: true,
   done: false,
-  task: { alarms: '[15,0]' },
 };
-
-// צלצול למשימות חשובות: צליל, ניסיון, והרשאות שצריך בשביל מסך מלא ותזמון מדויק
-function ImportantAlarmsSection() {
-  const { importantColor } = useTheme();
-  const [sound, setSound] = useState(null);
-  const [perms, setPerms] = useState({ full: true, exact: true });
-  const refresh = useCallback(() => {
-    if (!alarmsAvailable()) return;
-    setSound(getAlarmSound());
-    setPerms({ full: canUseFullScreen(), exact: canScheduleExact() });
-  }, []);
-  useEffect(() => {
-    refresh();
-    const sub = AppState.addEventListener('change', (st) => st === 'active' && refresh());
-    return () => sub.remove();
-  }, [refresh]);
-
-  if (!alarmsAvailable()) {
-    return (
-      <Group title="משימות חשובות — צלצול" footer="הצלצול דורש את הגרסה החדשה של האפליקציה (קובץ APK). משימות חשובות עדיין מודגשות ומופיעות למעלה.">
-        <Row icon="alarm-outline" iconColor={importantColor} title="צלצול לא זמין בגרסה הזו" />
-      </Group>
-    );
-  }
-  return (
-    <Group
-      title="משימות חשובות — צלצול"
-      footer="משימה חשובה עם שעה מצלצלת כמו שעון מעורר — מסך מלא, צליל בלופ ורטט — עם בוצע / נודניק / עצור. את מתי לצלצל בוחרים בכל משימה."
-    >
-      <Row
-        icon="musical-notes-outline"
-        iconColor={importantColor}
-        title="צליל"
-        value={sound?.title || 'ברירת מחדל'}
-        chevron
-        onPress={async () => {
-          const s = await pickAlarmSound();
-          if (s) setSound(s);
-        }}
-      />
-      {sound?.uri ? <Row icon="refresh-outline" title="חזרה לצליל ברירת המחדל" onPress={() => setSound(resetAlarmSound())} /> : null}
-      <Row icon="play-circle-outline" iconColor={importantColor} title="נסה צלצול עכשיו" chevron onPress={() => testAlarm(importantColor)} />
-      {!perms.full ? (
-        <Row icon="warning-outline" danger title="לאשר הצגה במסך מלא" subtitle="בלי זה הצלצול יופיע רק כהתראה" chevron onPress={openFullScreenSettings} />
-      ) : null}
-      {!perms.exact ? (
-        <Row icon="warning-outline" danger title="לאשר שעונים מעוררים ותזכורות" subtitle="בלי זה הצלצול עלול להתעכב" chevron onPress={openExactSettings} />
-      ) : null}
-    </Group>
-  );
-}
 
 // עדכונים: גרסה, בדיקה ידנית, הפעלה ו"מה חדש"
 function UpdatesSection() {

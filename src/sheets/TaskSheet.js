@@ -4,7 +4,7 @@ import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet from '../components/BottomSheet';
-import { Button, Chips, MultiChips, DayToggles, Field, Label, Stepper, Group, Row, Toggle } from '../components/controls';
+import { Button, Chips, DayToggles, Field, Label, Stepper, Group, Row, Toggle } from '../components/controls';
 import { pickDate, pickTime } from '../components/pickers';
 import { useAppState } from '../state/AppState';
 import { createTask, editTask, removeTask, saveCategory, getTaskHistory, forgetTask } from '../db/repo';
@@ -12,7 +12,6 @@ import { rankSuggestions, highlightParts } from '../logic/suggest';
 import ColorPicker from '../components/ColorPicker';
 import { afterChange } from '../services/actions';
 import { REMINDER_OPTIONS } from '../services/notifications';
-import { ALARM_OPTIONS, DEFAULT_ALARMS, parseAlarms } from '../services/alarms';
 import { parseRule, validateRule } from '../logic/recurrence';
 import { newId } from '../logic/editing';
 import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey, formatTimeRange, timeModeOf, timesFor, END_OF_DAY } from '../logic/dates';
@@ -41,7 +40,6 @@ function initialDraft(task, date, settings, categories) {
       end_time: '10:00',
       reminder: settings?.defaultReminder ?? 10,
       important: false,
-      alarms: DEFAULT_ALARMS,
       repeat: 'once',
       date: base,
       days: [weekday(base)],
@@ -63,7 +61,6 @@ function initialDraft(task, date, settings, categories) {
     end_time: task.end_time && task.end_time !== END_OF_DAY ? task.end_time : '',
     reminder: task.reminder ?? null,
     important: !!task.important,
-    alarms: task.important ? parseAlarms(task.alarms) : DEFAULT_ALARMS,
     repeat: task.kind === 'once' ? 'once' : rule.freq,
     date: task.kind === 'once' ? task.date : date,
     days: rule.days || [weekday(date || base)],
@@ -92,7 +89,6 @@ function toTask(d) {
     ...timesFor(d.timeMode, d.start_time, d.end_time),
     reminder: d.timeMode !== 'allday' ? d.reminder : null,
     important: !!d.important,
-    alarms: d.important && d.timeMode !== 'allday' ? d.alarms : null,
     kind: once ? 'once' : 'recurring',
     date: once ? d.date : null,
     rule,
@@ -313,7 +309,7 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
         <Ionicons name={d.important ? 'star' : 'star-outline'} size={22} color={d.important ? impColor : colors.ink3} />
         <View style={styles.importantTexts}>
           <Text style={styles.importantTitle}>משימה חשובה</Text>
-          <Text style={styles.importantSub}>{d.important ? 'תופיע למעלה, מודגשת, ותצלצל כמו שעון מעורר' : 'להבליט ולקבל צלצול לפני'}</Text>
+          <Text style={styles.importantSub}>{d.important ? 'תופיע למעלה ומודגשת' : 'להבליט ולהציג בראש הרשימה'}</Text>
         </View>
         <Toggle value={d.important} onValueChange={(v) => set({ important: v })} />
       </Pressable>
@@ -419,17 +415,6 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
             <Label>{d.timeMode === 'until' ? 'תזכורת לפני השעה' : 'תזכורת לפני'}</Label>
             <Chips options={REMINDER_OPTIONS} value={d.reminder} onChange={(v) => set({ reminder: v })} />
           </>
-        ) : null}
-
-        {d.important ? (
-          <Animated.View entering={motion(FadeIn)}>
-            <Label>⏰ צלצול (כמו שעון מעורר)</Label>
-            {d.timeMode !== 'allday' ? (
-              <MultiChips options={ALARM_OPTIONS} values={d.alarms} onChange={(v) => set({ alarms: v })} />
-            ) : (
-              <Text style={styles.importantHint}>כדי שיצלצל — צריך לקבוע שעה למשימה</Text>
-            )}
-          </Animated.View>
         ) : null}
 
         <Label>הערות</Label>

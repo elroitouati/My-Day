@@ -93,37 +93,6 @@ export function Chips({ options, value, onChange, colorFor, fontFor }) {
   );
 }
 
-// כמו Chips, אבל אפשר לבחור כמה
-export function MultiChips({ options, values, onChange }) {
-  const styles = useStyles(makeStyles);
-  const set = new Set(values || []);
-  return (
-    <View style={styles.chips}>
-      {options.map((o) => {
-        const active = set.has(o.value);
-        return (
-          <Pressable
-            key={String(o.value)}
-            onPress={() => {
-              tap();
-              const next = new Set(set);
-              if (active) next.delete(o.value);
-              else next.add(o.value);
-              onChange(options.map((x) => x.value).filter((v) => next.has(v)));
-            }}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: active }}
-            style={[styles.chip, active && { backgroundColor: colors.brand, borderColor: colors.brand }]}
-          >
-            {active ? <Ionicons name="checkmark" size={14} color={colors.onBrand} /> : null}
-            <Text style={[styles.chipText, active && styles.chipTextActive, active && { color: colors.onBrand }]}>{o.label}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 export function DayToggles({ value, onChange }) {
   const styles = useStyles(makeStyles);
   return (

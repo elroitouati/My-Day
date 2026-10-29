@@ -33,7 +33,6 @@ export default function TaskCard({ item, index = 0, onToggle, onPress, onLongPre
   const ink = solid ? onColor(c) : null;
   const accent = imp ? c : item.color; // בחשובה — פס הצד והעיגול בצבע החשיבות
   const meta = [formatTimeRange(item.startTime, item.endTime), item.categoryName].filter(Boolean).join(' · ');
-  const hasAlarm = imp && (item.task?.alarms || '').length > 2;
   return (
     <Animated.View entering={motion(FadeInDown.delay(Math.min(index, 8) * 35).duration(260))} layout={motion(LinearTransition.springify().damping(18))}>
       <Pressable
@@ -76,7 +75,6 @@ export default function TaskCard({ item, index = 0, onToggle, onPress, onLongPre
             {item.title}
           </Text>
           <View style={styles.metaRow}>
-            {hasAlarm ? <Ionicons name="alarm-outline" size={13} color={solid ? ink : c} style={styles.metaIcon} /> : null}
             {SOURCE_ICON[item.source] ? <Ionicons name={SOURCE_ICON[item.source]} size={13} color={solid ? ink : colors.ink3} style={styles.metaIcon} /> : null}
             {item.recurring ? <Ionicons name="repeat" size={13} color={solid ? ink : colors.ink3} style={styles.metaIcon} /> : null}
             <Text style={[styles.meta, solid && { color: ink, opacity: 0.85 }]} numberOfLines={1}>
