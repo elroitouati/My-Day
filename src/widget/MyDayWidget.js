@@ -151,7 +151,7 @@ function Row({ item, C, z, prefs, pop }) {
         }}
       >
         <TextWidget
-          text={item.title}
+          text={item.important && !item.done ? `★ ${item.title}` : item.title}
           maxLines={1}
           truncate="END"
           style={{

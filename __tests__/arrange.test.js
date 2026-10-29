@@ -42,3 +42,15 @@ describe('inQuietHours', () => {
   });
   test('disabled', () => expect(inQuietHours(at(1, 23), { enabled: false })).toBe(false));
 });
+
+describe('important tasks', () => {
+  const it2 = (uid, o = {}) => ({ uid, done: false, important: false, ...o });
+  test('open important tasks go to the top, done ones stay in place', () => {
+    const list = arrangeItems([it2('a'), it2('b', { important: true }), it2('c', { important: true, done: true })]);
+    expect(list.map((i) => i.uid)).toEqual(['b', 'a', 'c']);
+  });
+  test('important stays on top in manual order too', () => {
+    const list = arrangeItems([it2('a'), it2('b', { important: true })], { sortMode: 'manual', order: ['a', 'b'] });
+    expect(list[0].uid).toBe('b');
+  });
+});

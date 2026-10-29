@@ -4,7 +4,7 @@ import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet from '../components/BottomSheet';
-import { Button, Chips, DayToggles, Field, Label, Stepper, Group, Row, Toggle } from '../components/controls';
+import { Button, Chips, MultiChips, DayToggles, Field, Label, Stepper, Group, Row, Toggle } from '../components/controls';
 import { pickDate, pickTime } from '../components/pickers';
 import { useAppState } from '../state/AppState';
 import { createTask, editTask, removeTask, saveCategory, getTaskHistory, forgetTask } from '../db/repo';
@@ -12,10 +12,11 @@ import { rankSuggestions, highlightParts } from '../logic/suggest';
 import ColorPicker from '../components/ColorPicker';
 import { afterChange } from '../services/actions';
 import { REMINDER_OPTIONS } from '../services/notifications';
+import { ALARM_OPTIONS, DEFAULT_ALARMS, parseAlarms } from '../services/alarms';
 import { parseRule, validateRule } from '../logic/recurrence';
 import { newId } from '../logic/editing';
 import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey, formatTimeRange } from '../logic/dates';
-import { PALETTE, colors, space, text, font, shadow } from '../design/tokens';
+import { PALETTE, STAR, colors, space, text, font, shadow, tint } from '../design/tokens';
 import { useStyles } from '../state/Theme';
 import { haptic, motion } from '../design/feedback';
 
@@ -39,6 +40,8 @@ function initialDraft(task, date, settings, categories) {
       start_time: '09:00',
       end_time: '10:00',
       reminder: settings?.defaultReminder ?? 10,
+      important: false,
+      alarms: DEFAULT_ALARMS,
       repeat: 'once',
       date: base,
       days: [weekday(base)],
@@ -59,6 +62,8 @@ function initialDraft(task, date, settings, categories) {
     start_time: task.start_time || '09:00',
     end_time: task.end_time || '',
     reminder: task.reminder ?? null,
+    important: !!task.important,
+    alarms: task.important ? parseAlarms(task.alarms) : DEFAULT_ALARMS,
     repeat: task.kind === 'once' ? 'once' : rule.freq,
     date: task.kind === 'once' ? task.date : date,
     days: rule.days || [weekday(date || base)],
@@ -87,6 +92,8 @@ function toTask(d) {
     start_time: d.timed ? d.start_time : null,
     end_time: d.timed && d.end_time ? d.end_time : null,
     reminder: d.timed ? d.reminder : null,
+    important: !!d.important,
+    alarms: d.important && d.timed ? d.alarms : null,
     kind: once ? 'once' : 'recurring',
     date: once ? d.date : null,
     rule,
@@ -132,7 +139,13 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
   // השלמה אוטומטית: משימות שכבר הקלדת בעבר
   const [history, setHistory] = useState([]);
   const [suggestOpen, setSuggestOpen] = useState(!task);
-  const loadHistory = useCallback(() => getTaskHistory().then(setHistory).catch(() => {}), []);
+  const loadHistory = useCallback(
+    () =>
+      getTaskHistory()
+        .then(setHistory)
+        .catch(() => {}),
+    []
+  );
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
@@ -148,7 +161,7 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
       timed: !!h.start_time,
       start_time: h.start_time || d.start_time,
       end_time: h.end_time || '',
-      reminder: h.start_time ? h.reminder ?? null : d.reminder,
+      reminder: h.start_time ? (h.reminder ?? null) : d.reminder,
     });
     setSuggestOpen(false);
   }; // { name, color } כשיוצרים קטגוריה מתוך הגיליון
@@ -268,7 +281,9 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
                 <View style={styles.suggestTexts}>
                   <Text style={styles.suggestTitle} numberOfLines={1}>
                     {highlightParts(h.title, d.title).map((part, i) => (
-                      <Text key={i} style={part.hit ? styles.suggestHit : null}>{part.text}</Text>
+                      <Text key={i} style={part.hit ? styles.suggestHit : null}>
+                        {part.text}
+                      </Text>
                     ))}
                   </Text>
                   <Text style={styles.suggestMeta} numberOfLines={1}>
@@ -282,6 +297,23 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
         </Animated.View>
       ) : null}
 
+      <Pressable
+        onPress={() => {
+          haptic.light();
+          set({ important: !d.important });
+        }}
+        style={[styles.importantRow, d.important && styles.importantRowOn]}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: d.important }}
+      >
+        <Ionicons name={d.important ? 'star' : 'star-outline'} size={22} color={d.important ? STAR : colors.ink3} />
+        <View style={styles.importantTexts}>
+          <Text style={styles.importantTitle}>משימה חשובה</Text>
+          <Text style={styles.importantSub}>{d.important ? 'תופיע למעלה, מודגשת, ותצלצל כמו שעון מעורר' : 'להבליט ולקבל צלצול לפני'}</Text>
+        </View>
+        <Toggle value={d.important} onValueChange={(v) => set({ important: v })} />
+      </Pressable>
+
       <Label>קטגוריה</Label>
       <Chips options={catOptions} value={newCat ? NEW_CATEGORY : d.category_id} onChange={chooseCategory} colorFor={(o) => o.color} />
       {newCat ? (
@@ -294,7 +326,10 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
 
       <Label>צבע המשימה</Label>
       <Chips
-        options={[{ value: 'cat', label: d.category_id ? 'כמו הקטגוריה' : 'בלי צבע' }, { value: 'own', label: 'צבע משלה' }]}
+        options={[
+          { value: 'cat', label: d.category_id ? 'כמו הקטגוריה' : 'בלי צבע' },
+          { value: 'own', label: 'צבע משלה' },
+        ]}
         value={d.color ? 'own' : 'cat'}
         onChange={(v) => set({ color: v === 'own' ? d.color || catColor || PALETTE[5] : null })}
       />
@@ -327,9 +362,19 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
 
         <Group>
           {recurring ? (
-            <Row icon="play-outline" title="מתחילה ב-" value={formatHebDate(d.start_date, { year: true })} onPress={() => pickDate(d.start_date, (k) => set({ start_date: k }))} />
+            <Row
+              icon="play-outline"
+              title="מתחילה ב-"
+              value={formatHebDate(d.start_date, { year: true })}
+              onPress={() => pickDate(d.start_date, (k) => set({ start_date: k }))}
+            />
           ) : (
-            <Row icon="calendar-outline" title="תאריך" value={formatHebDate(d.date, { year: true })} onPress={() => pickDate(d.date, (k) => set({ date: k }))} />
+            <Row
+              icon="calendar-outline"
+              title="תאריך"
+              value={formatHebDate(d.date, { year: true })}
+              onPress={() => pickDate(d.date, (k) => set({ date: k }))}
+            />
           )}
           {recurring ? (
             <Row
@@ -348,9 +393,7 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
             trailing={<Toggle value={d.timed} onValueChange={(v) => set({ timed: v })} />}
           />
           {d.timed ? <Row title="התחלה" value={d.start_time} onPress={() => pickTime(d.start_time, setStart)} /> : null}
-          {d.timed ? (
-            <Row title="סיום" value={d.end_time || 'ללא'} onPress={() => pickTime(d.end_time || d.start_time, (t) => set({ end_time: t }))} />
-          ) : null}
+          {d.timed ? <Row title="סיום" value={d.end_time || 'ללא'} onPress={() => pickTime(d.end_time || d.start_time, (t) => set({ end_time: t }))} /> : null}
         </Group>
 
         {d.timed ? (
@@ -358,6 +401,17 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
             <Label>תזכורת לפני</Label>
             <Chips options={REMINDER_OPTIONS} value={d.reminder} onChange={(v) => set({ reminder: v })} />
           </>
+        ) : null}
+
+        {d.important ? (
+          <Animated.View entering={motion(FadeIn)}>
+            <Label>⏰ צלצול (כמו שעון מעורר)</Label>
+            {d.timed ? (
+              <MultiChips options={ALARM_OPTIONS} values={d.alarms} onChange={(v) => set({ alarms: v })} />
+            ) : (
+              <Text style={styles.importantHint}>כדי שיצלצל — צריך לקבוע שעה למשימה</Text>
+            )}
+          </Animated.View>
         ) : null}
 
         <Label>הערות</Label>
@@ -382,25 +436,43 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
   );
 }
 
-const makeStyles = () => StyleSheet.create({
-  form: { gap: space[4] },
-  block: { gap: space[4] },
-  suggest: { backgroundColor: colors.card, borderRadius: 20, marginTop: -space[2], overflow: 'hidden', ...shadow.card },
-  suggestRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3] },
-  suggestSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
-  suggestPressed: { backgroundColor: colors.sunken },
-  suggestBar: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
-  suggestTexts: { flex: 1, minWidth: 0 },
-  suggestTitle: { ...text.body, fontFamily: font.bold, textAlign: 'left' },
-  suggestHit: { color: colors.brand },
-  suggestMeta: { ...text.caption, textAlign: 'left' },
-  newCat: { gap: space[3], backgroundColor: colors.sunken, borderRadius: 24, padding: space[4] },
-  heading: { ...text.title, textAlign: 'left' },
-  inline: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
-  inlineText: { ...text.body },
-  hint: { ...text.caption, textAlign: 'left', marginTop: -space[2] },
-  error: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.missedSoft, padding: space[3], borderRadius: 14 },
-  errorText: { ...text.sub, color: colors.missed, fontFamily: font.bold, flex: 1, textAlign: 'left' },
-  delete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: space[3] },
-  deleteText: { ...text.body, color: colors.missed },
-});
+const makeStyles = () =>
+  StyleSheet.create({
+    importantRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: space[3],
+      backgroundColor: colors.sunken,
+      borderRadius: 18,
+      paddingHorizontal: space[3],
+      paddingVertical: space[2],
+      marginTop: space[3],
+      borderWidth: 1.5,
+      borderColor: 'transparent',
+    },
+    importantRowOn: { backgroundColor: tint(STAR, 0.12), borderColor: STAR },
+    importantTexts: { flex: 1 },
+    importantTitle: { fontFamily: font.bold, fontSize: 16, color: colors.ink, textAlign: 'left' },
+    importantSub: { ...text.caption, color: colors.ink2, textAlign: 'left' },
+    importantHint: { ...text.sub, textAlign: 'left' },
+    form: { gap: space[4] },
+    block: { gap: space[4] },
+    suggest: { backgroundColor: colors.card, borderRadius: 20, marginTop: -space[2], overflow: 'hidden', ...shadow.card },
+    suggestRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], paddingVertical: space[3] },
+    suggestSep: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+    suggestPressed: { backgroundColor: colors.sunken },
+    suggestBar: { width: 4, alignSelf: 'stretch', borderRadius: 2 },
+    suggestTexts: { flex: 1, minWidth: 0 },
+    suggestTitle: { ...text.body, fontFamily: font.bold, textAlign: 'left' },
+    suggestHit: { color: colors.brand },
+    suggestMeta: { ...text.caption, textAlign: 'left' },
+    newCat: { gap: space[3], backgroundColor: colors.sunken, borderRadius: 24, padding: space[4] },
+    heading: { ...text.title, textAlign: 'left' },
+    inline: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
+    inlineText: { ...text.body },
+    hint: { ...text.caption, textAlign: 'left', marginTop: -space[2] },
+    error: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.missedSoft, padding: space[3], borderRadius: 14 },
+    errorText: { ...text.sub, color: colors.missed, fontFamily: font.bold, flex: 1, textAlign: 'left' },
+    delete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: space[3] },
+    deleteText: { ...text.body, color: colors.missed },
+  });

@@ -102,6 +102,11 @@ const MIGRATIONS = [
   INSERT OR IGNORE INTO task_history (title, category_id, start_time, end_time, reminder, uses, last_used)
     SELECT title, category_id, start_time, end_time, reminder, 1, updated_at FROM tasks;
   `,
+  // גרסה 4 — משימות חשובות: סימון + מתי לצלצל (JSON של דקות לפני ההתחלה)
+  `
+  ALTER TABLE tasks ADD COLUMN important INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE tasks ADD COLUMN alarms TEXT;
+  `,
 ];
 
 let dbPromise = null;

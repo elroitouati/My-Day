@@ -39,6 +39,7 @@ export function buildRangeItems(startKey, endKey, data, today) {
         startTime: task.start_time || null,
         endTime: task.end_time || null,
         recurring: task.kind === 'recurring',
+        important: !!task.important,
         done: done(key, date),
         task,
       });

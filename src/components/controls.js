@@ -83,7 +83,40 @@ export function Chips({ options, value, onChange, colorFor, fontFor }) {
             style={[styles.chip, active && { backgroundColor: c, borderColor: c }]}
           >
             {own && !active ? <View style={[styles.dot, { backgroundColor: own }]} /> : null}
-            <Text style={[styles.chipText, active && styles.chipTextActive, active && { color: onColor(c) }, fontFor && { fontFamily: fontFor(o) }]}>{o.label}</Text>
+            <Text style={[styles.chipText, active && styles.chipTextActive, active && { color: onColor(c) }, fontFor && { fontFamily: fontFor(o) }]}>
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// כמו Chips, אבל אפשר לבחור כמה
+export function MultiChips({ options, values, onChange }) {
+  const styles = useStyles(makeStyles);
+  const set = new Set(values || []);
+  return (
+    <View style={styles.chips}>
+      {options.map((o) => {
+        const active = set.has(o.value);
+        return (
+          <Pressable
+            key={String(o.value)}
+            onPress={() => {
+              tap();
+              const next = new Set(set);
+              if (active) next.delete(o.value);
+              else next.add(o.value);
+              onChange(options.map((x) => x.value).filter((v) => next.has(v)));
+            }}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: active }}
+            style={[styles.chip, active && { backgroundColor: colors.brand, borderColor: colors.brand }]}
+          >
+            {active ? <Ionicons name="checkmark" size={14} color={colors.onBrand} /> : null}
+            <Text style={[styles.chipText, active && styles.chipTextActive, active && { color: colors.onBrand }]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -149,10 +182,20 @@ export function Row({ icon, iconColor, title, subtitle, value, onPress, trailing
         </View>
       ) : null}
       <View style={styles.rowTexts}>
-        <Text style={[styles.rowTitle, danger && { color: colors.missed }]} numberOfLines={1}>{title}</Text>
-        {subtitle ? <Text style={styles.rowSub} numberOfLines={2}>{subtitle}</Text> : null}
+        <Text style={[styles.rowTitle, danger && { color: colors.missed }]} numberOfLines={1}>
+          {title}
+        </Text>
+        {subtitle ? (
+          <Text style={styles.rowSub} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        ) : null}
       </View>
-      {value != null ? <Text style={styles.rowValue} numberOfLines={1}>{value}</Text> : null}
+      {value != null ? (
+        <Text style={styles.rowValue} numberOfLines={1}>
+          {value}
+        </Text>
+      ) : null}
       {trailing}
       {chevron ? <Ionicons name="chevron-back" size={18} color={colors.ink3} /> : null}
     </>
@@ -198,84 +241,85 @@ export function Toggle({ value, onValueChange }) {
   );
 }
 
-const makeStyles = () => StyleSheet.create({
-  btn: {
-    height: 54,
-    borderRadius: radius.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space[2],
-    paddingHorizontal: space[5],
-  },
-  btnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
-  disabled: { opacity: 0.45 },
-  btnText: { fontFamily: font.bold, fontSize: fs(16) },
-  headerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingHorizontal: 14, borderRadius: 19, backgroundColor: colors.brandSoft },
-  headerBtnOn: { backgroundColor: colors.brand },
-  headerBtnText: { fontFamily: font.bold, fontSize: fs(14), color: colors.brand },
-  label: { ...text.caption, color: colors.ink2, fontFamily: font.bold, marginBottom: -space[2], textAlign: 'left' },
-  field: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    paddingHorizontal: space[4],
-    paddingVertical: space[3],
-    minHeight: 52,
-    fontFamily: font.medium,
-    fontSize: fs(16),
-    color: colors.ink,
-    textAlign: 'left', // ב-RTL אנדרואיד מחליף left↔right, כך ש-left = תחילת השורה (ימין)
-  },
-  fieldMulti: { minHeight: 90, textAlignVertical: 'top' },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    height: 38,
-    borderRadius: radius.pill,
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-  },
-  dot: { width: 9, height: 9, borderRadius: 5 },
-  chipText: { fontFamily: font.medium, fontSize: fs(14), color: colors.ink2 },
-  chipTextActive: { color: '#FFFFFF', fontFamily: font.bold },
-  days: { flexDirection: 'row', justifyContent: 'space-between' },
-  day: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: colors.card,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayOn: { backgroundColor: colors.brand, borderColor: colors.brand },
-  dayText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink2 },
-  dayTextOn: { color: colors.onBrand },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: colors.card,
-    borderRadius: radius.pill,
-    padding: 4,
-  },
-  stepBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
-  stepValue: { ...text.heading, minWidth: 84, textAlign: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], minHeight: 56, paddingVertical: space[2] },
-  rowPressed: { backgroundColor: colors.sunken },
-  rowIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  rowTexts: { flex: 1, minWidth: 0 },
-  rowTitle: { ...text.body, textAlign: 'left' },
-  rowSub: { ...text.caption, textAlign: 'left' },
-  rowValue: { ...text.sub, color: colors.brand, fontFamily: font.bold, maxWidth: 170 },
-  groupWrap: { gap: space[2] },
-  groupTitle: { ...text.caption, fontFamily: font.bold, color: colors.ink2, paddingHorizontal: space[2], textAlign: 'left' },
-  group: { backgroundColor: colors.card, borderRadius: radius.card, overflow: 'hidden', ...shadow.card },
-  sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.line, marginStart: space[4] },
-  groupFooter: { ...text.caption, paddingHorizontal: space[2], textAlign: 'left' },
-});
+const makeStyles = () =>
+  StyleSheet.create({
+    btn: {
+      height: 54,
+      borderRadius: radius.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: space[2],
+      paddingHorizontal: space[5],
+    },
+    btnPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
+    disabled: { opacity: 0.45 },
+    btnText: { fontFamily: font.bold, fontSize: fs(16) },
+    headerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingHorizontal: 14, borderRadius: 19, backgroundColor: colors.brandSoft },
+    headerBtnOn: { backgroundColor: colors.brand },
+    headerBtnText: { fontFamily: font.bold, fontSize: fs(14), color: colors.brand },
+    label: { ...text.caption, color: colors.ink2, fontFamily: font.bold, marginBottom: -space[2], textAlign: 'left' },
+    field: {
+      backgroundColor: colors.card,
+      borderRadius: radius.md,
+      paddingHorizontal: space[4],
+      paddingVertical: space[3],
+      minHeight: 52,
+      fontFamily: font.medium,
+      fontSize: fs(16),
+      color: colors.ink,
+      textAlign: 'left', // ב-RTL אנדרואיד מחליף left↔right, כך ש-left = תחילת השורה (ימין)
+    },
+    fieldMulti: { minHeight: 90, textAlignVertical: 'top' },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      height: 38,
+      borderRadius: radius.pill,
+      backgroundColor: colors.card,
+      borderWidth: 1.5,
+      borderColor: colors.line,
+    },
+    dot: { width: 9, height: 9, borderRadius: 5 },
+    chipText: { fontFamily: font.medium, fontSize: fs(14), color: colors.ink2 },
+    chipTextActive: { color: '#FFFFFF', fontFamily: font.bold },
+    days: { flexDirection: 'row', justifyContent: 'space-between' },
+    day: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: colors.card,
+      borderWidth: 1.5,
+      borderColor: colors.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dayOn: { backgroundColor: colors.brand, borderColor: colors.brand },
+    dayText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink2 },
+    dayTextOn: { color: colors.onBrand },
+    stepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: colors.card,
+      borderRadius: radius.pill,
+      padding: 4,
+    },
+    stepBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.brandSoft, alignItems: 'center', justifyContent: 'center' },
+    stepValue: { ...text.heading, minWidth: 84, textAlign: 'center' },
+    row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingHorizontal: space[4], minHeight: 56, paddingVertical: space[2] },
+    rowPressed: { backgroundColor: colors.sunken },
+    rowIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+    rowTexts: { flex: 1, minWidth: 0 },
+    rowTitle: { ...text.body, textAlign: 'left' },
+    rowSub: { ...text.caption, textAlign: 'left' },
+    rowValue: { ...text.sub, color: colors.brand, fontFamily: font.bold, maxWidth: 170 },
+    groupWrap: { gap: space[2] },
+    groupTitle: { ...text.caption, fontFamily: font.bold, color: colors.ink2, paddingHorizontal: space[2], textAlign: 'left' },
+    group: { backgroundColor: colors.card, borderRadius: radius.card, overflow: 'hidden', ...shadow.card },
+    sep: { height: StyleSheet.hairlineWidth, backgroundColor: colors.line, marginStart: space[4] },
+    groupFooter: { ...text.caption, paddingHorizontal: space[2], textAlign: 'left' },
+  });

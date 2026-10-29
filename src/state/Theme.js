@@ -19,6 +19,7 @@ export const DEFAULT_THEME = {
   doneItems: 'inline', // inline | bottom | hide
   sortMode: 'auto', // auto | manual
   startTab: 'Today',
+  importantStyle: 'glow', // glow | badge | bold — איך משימה חשובה נראית
 };
 
 export function ThemeProvider({ initial, children }) {

@@ -72,13 +72,36 @@ export async function deleteCategory(id) {
 // ---------------------------------------------------------------------------
 //  משימות
 // ---------------------------------------------------------------------------
-const COLS = ['id', 'title', 'category_id', 'color', 'notes', 'start_time', 'end_time', 'kind', 'date', 'rule', 'start_date', 'end_date', 'reminder'];
+const COLS = [
+  'id',
+  'title',
+  'category_id',
+  'color',
+  'notes',
+  'start_time',
+  'end_time',
+  'kind',
+  'date',
+  'rule',
+  'start_date',
+  'end_date',
+  'reminder',
+  'important',
+  'alarms',
+];
+
+// ערך לעמודה: important תמיד 0/1, alarms נשמר כ-JSON
+function colValue(c, v) {
+  if (c === 'important') return v ? 1 : 0;
+  if (c === 'alarms') return Array.isArray(v) ? (v.length ? JSON.stringify(v) : null) : (v ?? null);
+  return v ?? null;
+}
 
 async function insertTask(db, task) {
   const now = Date.now();
   await db.runAsync(
     `INSERT INTO tasks (${COLS.join(', ')}, created_at, updated_at) VALUES (${COLS.map(() => '?').join(', ')}, ?, ?)`,
-    ...COLS.map((c) => task[c] ?? null),
+    ...COLS.map((c) => colValue(c, task[c])),
     now,
     now
   );
@@ -89,7 +112,7 @@ async function updateTask(db, id, patch) {
   if (!keys.length) return;
   await db.runAsync(
     `UPDATE tasks SET ${keys.map((k) => `${k} = ?`).join(', ')}, updated_at = ? WHERE id = ?`,
-    ...keys.map((k) => patch[k] ?? null),
+    ...keys.map((k) => colValue(k, patch[k])),
     Date.now(),
     id
   );
@@ -124,7 +147,13 @@ export async function rememberTask(t) {
      ON CONFLICT(title) DO UPDATE SET
        category_id = excluded.category_id, color = excluded.color, start_time = excluded.start_time,
        end_time = excluded.end_time, reminder = excluded.reminder, uses = uses + 1, last_used = excluded.last_used`,
-    t.title.trim(), t.category_id ?? null, t.color ?? null, t.start_time ?? null, t.end_time ?? null, t.reminder ?? null, Date.now()
+    t.title.trim(),
+    t.category_id ?? null,
+    t.color ?? null,
+    t.start_time ?? null,
+    t.end_time ?? null,
+    t.reminder ?? null,
+    Date.now()
   );
 }
 
@@ -150,14 +179,18 @@ async function runPlan(db, plan) {
         await db.runAsync(
           `INSERT OR IGNORE INTO completions (item_key, date, done_at)
            SELECT ?, date, done_at FROM completions WHERE item_key = ? AND date = ?`,
-          itemKeyForTask(step.task.id), itemKeyForTask(fromId), fromDate
+          itemKeyForTask(step.task.id),
+          itemKeyForTask(fromId),
+          fromDate
         );
       }
       if (step.carryFutureCompletions) {
         const { fromId, fromDate } = step.carryFutureCompletions;
         await db.runAsync(
           'UPDATE OR IGNORE completions SET item_key = ? WHERE item_key = ? AND date >= ?',
-          itemKeyForTask(step.task.id), itemKeyForTask(fromId), fromDate
+          itemKeyForTask(step.task.id),
+          itemKeyForTask(fromId),
+          fromDate
         );
       }
     }
@@ -199,7 +232,14 @@ export async function replaceCalendarCache(startKey, endKey, rows) {
       await db.runAsync(
         `INSERT OR REPLACE INTO cal_events (event_id, date, calendar_id, title, start_time, end_time, all_day, color)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        r.event_id, r.date, r.calendar_id, r.title, r.start_time, r.end_time, r.all_day ? 1 : 0, r.color
+        r.event_id,
+        r.date,
+        r.calendar_id,
+        r.title,
+        r.start_time,
+        r.end_time,
+        r.all_day ? 1 : 0,
+        r.color
       );
     }
   });
@@ -223,7 +263,13 @@ export async function upsertPanmatzRow(r) {
   await db.runAsync(
     `INSERT OR REPLACE INTO panmatz_items (date, goal_id, title, target, done, deleted, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    r.date, r.goal_id, r.title ?? '', r.target ?? '', r.done ? 1 : 0, r.deleted ? 1 : 0, r.updated_at
+    r.date,
+    r.goal_id,
+    r.title ?? '',
+    r.target ?? '',
+    r.done ? 1 : 0,
+    r.deleted ? 1 : 0,
+    r.updated_at
   );
 }
 
@@ -242,16 +288,16 @@ export async function enqueueChange(change) {
   const db = await getDb();
   await db.runAsync(
     'INSERT OR REPLACE INTO sync_queue (date, goal_id, done, updated_at) VALUES (?, ?, ?, ?)',
-    change.date, change.goal_id, change.done ? 1 : 0, change.updated_at
+    change.date,
+    change.goal_id,
+    change.done ? 1 : 0,
+    change.updated_at
   );
 }
 
 export async function dequeue(change) {
   const db = await getDb();
-  await db.runAsync(
-    'DELETE FROM sync_queue WHERE date = ? AND goal_id = ? AND updated_at = ?',
-    change.date, change.goal_id, change.updated_at
-  );
+  await db.runAsync('DELETE FROM sync_queue WHERE date = ? AND goal_id = ? AND updated_at = ?', change.date, change.goal_id, change.updated_at);
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +333,10 @@ export async function loadRange(startKey, endKey) {
     db.getAllAsync(
       `SELECT * FROM tasks WHERE (kind = 'once' AND date >= ? AND date <= ?)
          OR (kind = 'recurring' AND start_date <= ? AND (end_date IS NULL OR end_date >= ?))`,
-      startKey, endKey, endKey, startKey
+      startKey,
+      endKey,
+      endKey,
+      startKey
     ),
     db.getAllAsync('SELECT * FROM skips WHERE date >= ? AND date <= ?', startKey, endKey),
     db.getAllAsync('SELECT item_key, date FROM completions WHERE date >= ? AND date <= ?', startKey, endKey),

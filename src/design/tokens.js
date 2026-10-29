@@ -64,7 +64,13 @@ const DARK = {
 function mix(a, b, t) {
   const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   const [x, y] = [p(a), p(b)];
-  return `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+  return `#${x
+    .map((v, i) =>
+      Math.round(v + (y[i] - v) * t)
+        .toString(16)
+        .padStart(2, '0')
+    )
+    .join('')}`.toUpperCase();
 }
 
 // ערכה מוכנה לפי שם, או צבע משלך (hex) מבוחר הצבעים המלא
@@ -84,9 +90,7 @@ export function accentById(id) {
 }
 
 function luminance(hex) {
-  const c = [1, 3, 5]
-    .map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
-    .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
   return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
 }
 
@@ -110,10 +114,42 @@ export function buildPalette(mode = 'light', accentId = 'violet') {
 export const FONTS = [
   { id: 'heebo', name: 'היבו', regular: 'Heebo_400Regular', medium: 'Heebo_500Medium', bold: 'Heebo_700Bold', heavy: 'Heebo_800ExtraBold', scale: 1 },
   { id: 'rubik', name: 'רוביק', regular: 'Rubik_400Regular', medium: 'Rubik_500Medium', bold: 'Rubik_700Bold', heavy: 'Rubik_800ExtraBold', scale: 0.97 },
-  { id: 'assistant', name: 'אסיסטנט', regular: 'Assistant_400Regular', medium: 'Assistant_600SemiBold', bold: 'Assistant_700Bold', heavy: 'Assistant_800ExtraBold', scale: 1.04 },
-  { id: 'varela', name: 'ורלה עגול', regular: 'VarelaRound_400Regular', medium: 'VarelaRound_400Regular', bold: 'VarelaRound_400Regular', heavy: 'VarelaRound_400Regular', scale: 0.96 },
-  { id: 'frank', name: 'פרנק־רוהל', regular: 'FrankRuhlLibre_400Regular', medium: 'FrankRuhlLibre_500Medium', bold: 'FrankRuhlLibre_700Bold', heavy: 'FrankRuhlLibre_900Black', scale: 1.05 },
-  { id: 'amatic', name: 'כתב יד', regular: 'AmaticSC_400Regular', medium: 'AmaticSC_400Regular', bold: 'AmaticSC_700Bold', heavy: 'AmaticSC_700Bold', scale: 1.3 },
+  {
+    id: 'assistant',
+    name: 'אסיסטנט',
+    regular: 'Assistant_400Regular',
+    medium: 'Assistant_600SemiBold',
+    bold: 'Assistant_700Bold',
+    heavy: 'Assistant_800ExtraBold',
+    scale: 1.04,
+  },
+  {
+    id: 'varela',
+    name: 'ורלה עגול',
+    regular: 'VarelaRound_400Regular',
+    medium: 'VarelaRound_400Regular',
+    bold: 'VarelaRound_400Regular',
+    heavy: 'VarelaRound_400Regular',
+    scale: 0.96,
+  },
+  {
+    id: 'frank',
+    name: 'פרנק־רוהל',
+    regular: 'FrankRuhlLibre_400Regular',
+    medium: 'FrankRuhlLibre_500Medium',
+    bold: 'FrankRuhlLibre_700Bold',
+    heavy: 'FrankRuhlLibre_900Black',
+    scale: 1.05,
+  },
+  {
+    id: 'amatic',
+    name: 'כתב יד',
+    regular: 'AmaticSC_400Regular',
+    medium: 'AmaticSC_400Regular',
+    bold: 'AmaticSC_700Bold',
+    heavy: 'AmaticSC_700Bold',
+    scale: 1.3,
+  },
 ];
 
 export const TEXT_SIZES = [
@@ -192,12 +228,11 @@ export function applyTheme(t = {}) {
 
 applyTheme({});
 
+// צבע הכוכב של משימה חשובה
+export const STAR = '#F5A623';
+
 // פלטת צבעים חיים לקטגוריות
-export const PALETTE = [
-  '#FF4D6D', '#FF8A00', '#FFC300', '#10C77F', '#00B8D9',
-  '#3A86FF', '#6C5CFF', '#8B5CF6', '#FF4FBF', '#7CB518',
-  '#FF6B3D', '#14B8A6',
-];
+export const PALETTE = ['#FF4D6D', '#FF8A00', '#FFC300', '#10C77F', '#00B8D9', '#3A86FF', '#6C5CFF', '#8B5CF6', '#FF4FBF', '#7CB518', '#FF6B3D', '#14B8A6'];
 
 export const space = { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40 };
 
@@ -214,6 +249,8 @@ export function onColor(hex) {
 
 // צבע שקוף-למחצה מתוך hex
 export function tint(hex, alpha) {
-  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
+  const a = Math.round(alpha * 255)
+    .toString(16)
+    .padStart(2, '0');
   return `${hex.slice(0, 7)}${a}`;
 }

@@ -12,7 +12,7 @@ export function monthChips(items, capacity) {
     chips.push({
       key: i.uid,
       kind: i.source === 'calendar' && !i.startTime ? 'fill' : 'bar',
-      title: i.title,
+      title: i.important && !i.done ? `★ ${i.title}` : i.title,
       color: i.color,
       startTime: i.startTime,
       done: i.done,
@@ -30,7 +30,7 @@ export function monthChips(items, capacity) {
       missed: panmatz.some((p) => p.missed),
     });
   }
-  const rank = (c) => (c.kind === 'fill' ? 0 : 1);
+  const rank = (c) => (c.kind === 'fill' ? 0 : c.title.startsWith('★') ? 1 : 2);
   chips.sort((a, b) => Number(a.done) - Number(b.done) || rank(a) - rank(b) || (a.startTime || '').localeCompare(b.startTime || ''));
   if (chips.length <= capacity) return { chips, more: 0 };
   // שורה אחרונה מפנה מקום ל-"+N"

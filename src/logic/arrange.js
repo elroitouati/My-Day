@@ -1,6 +1,7 @@
 // סידור רשימת היום לפי העדפות המשתמש — טהור ומכוסה בבדיקות.
 //  sortMode:  'auto'   — "כל היום" ואז לפי שעה (ברירת מחדל)
 //             'manual' — הסדר שנשמר בגרירה (פריטים חדשים נכנסים לפי הסדר האוטומטי, בסוף)
+//  משימות חשובות שעוד לא בוצעו — תמיד בראש הרשימה
 //  doneItems: 'inline' — במקום | 'bottom' — בסוף הרשימה | 'hide' — מוסתרים
 
 export function arrangeItems(items, { sortMode = 'auto', order = null, doneItems = 'inline' } = {}) {
@@ -11,6 +12,8 @@ export function arrangeItems(items, { sortMode = 'auto', order = null, doneItems
     const rest = list.filter((i) => !pos.has(i.uid));
     list = [...known, ...rest];
   }
+  // משימות חשובות תמיד למעלה (כל עוד לא בוצעו)
+  list = [...list.filter((i) => i.important && !i.done), ...list.filter((i) => !(i.important && !i.done))];
   if (doneItems === 'bottom') list = [...list.filter((i) => !i.done), ...list.filter((i) => i.done)];
   if (doneItems === 'hide') list = list.filter((i) => !i.done);
   return list;
