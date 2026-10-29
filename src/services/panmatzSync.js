@@ -2,19 +2,13 @@
 //  • פנמ"צ כותבת את יעדי היום וההשלמות.
 //  • My Day מציגה אותם, מאזינה ל-Realtime וכותבת חזרה כשמסמנים.
 //  • אופליין: כל סימון נכנס לתור מקומי ונשלח כשחוזר החיבור. updated_at האחרון קובע.
-import { supabase, currentUser } from "./supabase";
-import {
-  getPanmatzRow,
-  upsertPanmatzRow,
-  getQueue,
-  enqueueChange,
-  dequeue,
-} from "../db/repo";
-import { remoteWins } from "../logic/syncMerge";
-import { addDays, todayKey } from "../logic/dates";
-import { coalesce } from "./events";
+import { supabase, currentUser } from './supabase';
+import { getPanmatzRow, upsertPanmatzRow, getQueue, enqueueChange, dequeue } from '../db/repo';
+import { remoteWins } from '../logic/syncMerge';
+import { addDays, todayKey } from '../logic/dates';
+import { coalesce } from './events';
 
-const TABLE = "panmatz_daily";
+const TABLE = 'panmatz_daily';
 const BACK = 40;
 const FORWARD = 14;
 const ts = (v) => (v ? new Date(v).getTime() : 0);
@@ -28,9 +22,9 @@ async function flushNow() {
     const { error } = await supabase
       .from(TABLE)
       .update({ done: !!c.done, updated_at: c.updated_at })
-      .eq("user_id", user.id)
-      .eq("date", c.date)
-      .eq("goal_id", c.goal_id);
+      .eq('user_id', user.id)
+      .eq('date', c.date)
+      .eq('goal_id', c.goal_id);
     if (error) return false; // אין רשת / שגיאה — ננסה שוב בפעם הבאה
     await dequeue(c);
   }
@@ -45,10 +39,10 @@ async function pullNow() {
   const today = todayKey();
   const { data, error } = await supabase
     .from(TABLE)
-    .select("date, goal_id, title, target, done, deleted, updated_at")
-    .eq("user_id", user.id)
-    .gte("date", addDays(today, -BACK))
-    .lte("date", addDays(today, FORWARD));
+    .select('date, goal_id, title, target, done, deleted, updated_at')
+    .eq('user_id', user.id)
+    .gte('date', addDays(today, -BACK))
+    .lte('date', addDays(today, FORWARD));
   if (error) throw error;
   return mergeRemoteRows(data || []);
 }
@@ -62,12 +56,7 @@ export async function mergeRemoteRows(rows) {
     const mine = pending.get(`${r.date}|${r.goal_id}`);
     if (mine && ts(mine.updated_at) > ts(r.updated_at)) {
       // השינוי המקומי חדש יותר ועוד לא נשלח — שומרים עליו, אבל מעדכנים כותרת/יעד
-      if (
-        !local ||
-        local.title !== r.title ||
-        local.target !== r.target ||
-        !!local.deleted !== !!r.deleted
-      ) {
+      if (!local || local.title !== r.title || local.target !== r.target || !!local.deleted !== !!r.deleted) {
         await upsertPanmatzRow({
           ...r,
           done: mine.done,
@@ -78,13 +67,7 @@ export async function mergeRemoteRows(rows) {
       continue;
     }
     if (mine) await dequeue(mine); // השרת חדש יותר — השינוי המקומי ישן
-    if (
-      !local ||
-      remoteWins(local, r) ||
-      local.title !== r.title ||
-      local.target !== r.target ||
-      !!local.deleted !== !!r.deleted
-    ) {
+    if (!local || remoteWins(local, r) || local.title !== r.title || local.target !== r.target || !!local.deleted !== !!r.deleted) {
       await upsertPanmatzRow(r);
       changed = true;
     }
@@ -132,10 +115,10 @@ export function subscribePanmatz(userId, onChange) {
   const channel = supabase
     .channel(`panmatz-${userId}`)
     .on(
-      "postgres_changes",
+      'postgres_changes',
       {
-        event: "*",
-        schema: "public",
+        event: '*',
+        schema: 'public',
         table: TABLE,
         filter: `user_id=eq.${userId}`,
       },
@@ -147,11 +130,11 @@ export function subscribePanmatz(userId, onChange) {
         } catch {
           // יימשך בסנכרון הבא
         }
-      },
+      }
     )
     .subscribe((status) => {
       // אחרי חיבור (או חיבור מחדש) — משלימים את מה שפוספס
-      if (status === "SUBSCRIBED") {
+      if (status === 'SUBSCRIBED') {
         syncPanmatz().then((changed) => changed && onChange());
       }
     });

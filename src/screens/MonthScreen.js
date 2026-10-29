@@ -1,37 +1,16 @@
 // חודש: לוח בסגנון יומן — בכל יום רואים בקצרה מה יש בו. לחיצה על יום פותחת אותו.
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  useWindowDimensions,
-} from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
-import { Ionicons } from "@expo/vector-icons";
-import Screen from "../components/Screen";
-import { useAppState, useRange } from "../state/AppState";
-import {
-  buildMonthGrid,
-  monthLabel,
-  keyToDate,
-  HEB_WEEKDAYS_LETTER,
-  dayKey,
-} from "../logic/dates";
-import { progress } from "../logic/dayItems";
-import { monthChips } from "../logic/monthChips";
-import {
-  colors,
-  radius,
-  shadow,
-  space,
-  text,
-  font,
-  fs,
-  onColor,
-} from "../design/tokens";
-import { useStyles } from "../state/Theme";
-import { motion } from "../design/feedback";
+import React, { useState } from 'react';
+import { View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { Ionicons } from '@expo/vector-icons';
+import Screen from '../components/Screen';
+import { useAppState, useRange } from '../state/AppState';
+import { buildMonthGrid, monthLabel, keyToDate, HEB_WEEKDAYS_LETTER, dayKey } from '../logic/dates';
+import { progress } from '../logic/dayItems';
+import { monthChips } from '../logic/monthChips';
+import { colors, radius, shadow, space, text, font, fs, onColor } from '../design/tokens';
+import { useStyles } from '../state/Theme';
+import { motion } from '../design/feedback';
 
 const CHIP_H = 17; // גובה שורת צ'יפ
 const HEAD_H = 28; // מספר היום
@@ -62,42 +41,24 @@ export default function MonthScreen({ navigation }) {
       bottomPad={110}
       action={
         <View style={styles.nav}>
-          <Pressable
-            style={styles.navBtn}
-            onPress={() => move(-1)}
-            accessibilityLabel="החודש הקודם"
-          >
+          <Pressable style={styles.navBtn} onPress={() => move(-1)} accessibilityLabel="החודש הקודם">
             <Ionicons name="chevron-forward" size={20} color={colors.ink} />
           </Pressable>
           {!isCurrent ? (
-            <Pressable
-              style={[styles.navBtn, styles.todayBtn]}
-              onPress={() => setYm({ y: t.getFullYear(), m: t.getMonth() })}
-            >
+            <Pressable style={[styles.navBtn, styles.todayBtn]} onPress={() => setYm({ y: t.getFullYear(), m: t.getMonth() })}>
               <Text style={styles.todayText}>היום</Text>
             </Pressable>
           ) : null}
-          <Pressable
-            style={styles.navBtn}
-            onPress={() => move(1)}
-            accessibilityLabel="החודש הבא"
-          >
+          <Pressable style={styles.navBtn} onPress={() => move(1)} accessibilityLabel="החודש הבא">
             <Ionicons name="chevron-back" size={20} color={colors.ink} />
           </Pressable>
         </View>
       }
     >
-      <Animated.View
-        key={`${ym.y}-${ym.m}`}
-        entering={motion(FadeIn.duration(250))}
-        style={styles.card}
-      >
+      <Animated.View key={`${ym.y}-${ym.m}`} entering={motion(FadeIn.duration(250))} style={styles.card}>
         <View style={styles.week}>
           {HEB_WEEKDAYS_LETTER.map((l, i) => (
-            <Text
-              key={l}
-              style={[styles.weekday, i === 6 && styles.weekdayShabbat]}
-            >
+            <Text key={l} style={[styles.weekday, i === 6 && styles.weekdayShabbat]}>
               {l}
             </Text>
           ))}
@@ -105,10 +66,7 @@ export default function MonthScreen({ navigation }) {
         {grid.map((week, wi) => (
           <View key={wi} style={[styles.week, wi > 0 && styles.weekLine]}>
             {week.map((k, di) => {
-              if (!k)
-                return (
-                  <View key={di} style={[styles.cell, { height: cellH }]} />
-                );
+              if (!k) return <View key={di} style={[styles.cell, { height: cellH }]} />;
               const items = byDate[k] || [];
               const p = progress(items);
               const { chips, more } = monthChips(items, capacity);
@@ -126,83 +84,37 @@ export default function MonthScreen({ navigation }) {
                     isToday && styles.cellToday,
                     pressed && styles.cellPressed,
                   ]}
-                  onPress={() => navigation.navigate("Day", { date: k })}
+                  onPress={() => navigation.navigate('Day', { date: k })}
                   accessibilityLabel={`${keyToDate(k).getDate()}, ${p.total} משימות`}
                 >
                   <View style={styles.head}>
                     <View style={[styles.num, isToday && styles.numToday]}>
-                      <Text
-                        style={[
-                          styles.numText,
-                          isToday && styles.numTextToday,
-                          past && !isToday && styles.numTextPast,
-                        ]}
-                      >
-                        {keyToDate(k).getDate()}
-                      </Text>
+                      <Text style={[styles.numText, isToday && styles.numTextToday, past && !isToday && styles.numTextPast]}>{keyToDate(k).getDate()}</Text>
                     </View>
-                    {all ? (
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={13}
-                        color={colors.success}
-                      />
-                    ) : null}
+                    {all ? <Ionicons name="checkmark-circle" size={13} color={colors.success} /> : null}
                   </View>
                   {chips.map((c) =>
-                    c.kind === "fill" ? (
-                      <View
-                        key={c.key}
-                        style={[
-                          styles.chip,
-                          styles.chipFill,
-                          { backgroundColor: c.color },
-                          c.done && styles.chipDone,
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.chipText,
-                            styles.chipFillText,
-                            { color: onColor(c.color) },
-                          ]}
-                          numberOfLines={1}
-                          ellipsizeMode="clip"
-                        >
+                    c.kind === 'fill' ? (
+                      <View key={c.key} style={[styles.chip, styles.chipFill, { backgroundColor: c.color }, c.done && styles.chipDone]}>
+                        <Text style={[styles.chipText, styles.chipFillText, { color: onColor(c.color) }]} numberOfLines={1} ellipsizeMode="clip">
                           {c.title}
                         </Text>
                       </View>
                     ) : (
-                      <View
-                        key={c.key}
-                        style={[
-                          styles.chip,
-                          c.missed && styles.chipMissed,
-                          c.done && styles.chipDone,
-                        ]}
-                      >
+                      <View key={c.key} style={[styles.chip, c.missed && styles.chipMissed, c.done && styles.chipDone]}>
                         <View
                           style={[
                             styles.chipBar,
                             {
-                              backgroundColor: c.missed
-                                ? colors.missed
-                                : c.color,
+                              backgroundColor: c.missed ? colors.missed : c.color,
                             },
                           ]}
                         />
-                        <Text
-                          style={[
-                            styles.chipText,
-                            c.done && styles.chipTextDone,
-                          ]}
-                          numberOfLines={1}
-                          ellipsizeMode="clip"
-                        >
+                        <Text style={[styles.chipText, c.done && styles.chipTextDone]} numberOfLines={1} ellipsizeMode="clip">
                           {c.title}
                         </Text>
                       </View>
-                    ),
+                    )
                   )}
                   {more ? <Text style={styles.more}>+{more}</Text> : null}
                 </Pressable>
@@ -217,14 +129,14 @@ export default function MonthScreen({ navigation }) {
 
 const makeStyles = () =>
   StyleSheet.create({
-    nav: { flexDirection: "row", gap: 6 },
+    nav: { flexDirection: 'row', gap: 6 },
     navBtn: {
       width: 38,
       height: 38,
       borderRadius: 19,
       backgroundColor: colors.card,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       ...shadow.card,
     },
     todayBtn: { width: undefined, paddingHorizontal: 12 },
@@ -234,17 +146,17 @@ const makeStyles = () =>
       borderRadius: radius.card,
       paddingHorizontal: 4,
       paddingBottom: 4,
-      overflow: "hidden",
+      overflow: 'hidden',
       ...shadow.card,
     },
-    week: { flexDirection: "row" },
+    week: { flexDirection: 'row' },
     weekLine: {
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: colors.line,
     },
     weekday: {
       flex: 1,
-      textAlign: "center",
+      textAlign: 'center',
       ...text.caption,
       fontFamily: font.bold,
       paddingVertical: space[2],
@@ -255,7 +167,7 @@ const makeStyles = () =>
       paddingHorizontal: 2,
       paddingTop: 3,
       borderRadius: 10,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     cellShabbat: { backgroundColor: colors.sunken },
     cellAll: { backgroundColor: colors.successSoft },
@@ -263,17 +175,17 @@ const makeStyles = () =>
     cellPressed: { opacity: 0.6 },
     head: {
       height: HEAD_H,
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       paddingHorizontal: 1,
     },
     num: {
       minWidth: 24,
       height: 24,
       borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems: 'center',
+      justifyContent: 'center',
       paddingHorizontal: 3,
     },
     numToday: { backgroundColor: colors.brand },
@@ -283,13 +195,13 @@ const makeStyles = () =>
     chip: {
       height: CHIP_H,
       marginBottom: 2,
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection: 'row',
+      alignItems: 'center',
       borderRadius: 4,
-      overflow: "hidden",
+      overflow: 'hidden',
     },
     chipFill: { paddingHorizontal: 3 },
-    chipBar: { width: 3, alignSelf: "stretch", borderRadius: 2, marginEnd: 2 },
+    chipBar: { width: 3, alignSelf: 'stretch', borderRadius: 2, marginEnd: 2 },
     chipMissed: { backgroundColor: colors.missedSoft },
     chipDone: { opacity: 0.45 },
     chipText: {
@@ -298,10 +210,10 @@ const makeStyles = () =>
       fontSize: fs(10.5),
       lineHeight: CHIP_H - 1,
       color: colors.ink,
-      textAlign: "left",
+      textAlign: 'left',
     },
     chipFillText: { fontFamily: font.bold },
-    chipTextDone: { textDecorationLine: "line-through" },
+    chipTextDone: { textDecorationLine: 'line-through' },
     more: {
       fontFamily: font.bold,
       fontSize: fs(10),

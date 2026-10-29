@@ -22,6 +22,8 @@ import { PANMATZ_CATEGORY, UNCATEGORIZED } from '../logic/dayItems';
 import { colors, space, text, font, ACCENTS, TAB_STYLES, FONTS, TEXT_SIZES, DENSITIES, fs } from '../design/tokens';
 import { useStyles, useTheme } from '../state/Theme';
 import { haptic } from '../design/feedback';
+import WhatsNewSheet from '../sheets/WhatsNewSheet';
+import { checkForUpdate, applyUpdate, currentBuildDate, updatesEnabled, useUpdateState } from '../services/useUpdates';
 
 export default function SettingsScreen({ navigation }) {
   const styles = useStyles(makeStyles);
@@ -92,15 +94,39 @@ export default function SettingsScreen({ navigation }) {
         title="התראות"
         footer={notifPerm && !notifPerm.granted && settings.notificationsEnabled ? 'ההתראות חסומות בהגדרות הטלפון. לחץ על "פתיחת הגדרות" כדי לאשר.' : null}
       >
-        <Row icon="notifications-outline" title="התראות" trailing={<Toggle value={!!settings.notificationsEnabled && !!notifPerm?.granted} onValueChange={toggleNotifications} />} />
+        <Row
+          icon="notifications-outline"
+          title="התראות"
+          trailing={<Toggle value={!!settings.notificationsEnabled && !!notifPerm?.granted} onValueChange={toggleNotifications} />}
+        />
         {notifPerm && !notifPerm.granted ? <Row icon="open-outline" title="פתיחת הגדרות הטלפון" chevron onPress={() => Linking.openSettings()} /> : null}
-        <Row icon="moon-outline" title="תזכורת ערב" subtitle="רק אם נשארו משימות פתוחות" trailing={<Toggle value={!!settings.eveningEnabled} onValueChange={(v) => updateSetting('eveningEnabled', v)} />} />
+        <Row
+          icon="moon-outline"
+          title="תזכורת ערב"
+          subtitle="רק אם נשארו משימות פתוחות"
+          trailing={<Toggle value={!!settings.eveningEnabled} onValueChange={(v) => updateSetting('eveningEnabled', v)} />}
+        />
         {settings.eveningEnabled ? (
-          <Row title="שעת תזכורת הערב" value={settings.eveningTime} chevron onPress={() => pickTime(settings.eveningTime, (t) => updateSetting('eveningTime', t))} />
+          <Row
+            title="שעת תזכורת הערב"
+            value={settings.eveningTime}
+            chevron
+            onPress={() => pickTime(settings.eveningTime, (t) => updateSetting('eveningTime', t))}
+          />
         ) : null}
-        <Row icon="sunny-outline" title="תזכורת בוקר" subtitle="כמה משימות מחכות לך היום" trailing={<Toggle value={!!settings.morningEnabled} onValueChange={(v) => updateSetting('morningEnabled', v)} />} />
+        <Row
+          icon="sunny-outline"
+          title="תזכורת בוקר"
+          subtitle="כמה משימות מחכות לך היום"
+          trailing={<Toggle value={!!settings.morningEnabled} onValueChange={(v) => updateSetting('morningEnabled', v)} />}
+        />
         {settings.morningEnabled ? (
-          <Row title="שעת תזכורת הבוקר" value={settings.morningTime} chevron onPress={() => pickTime(settings.morningTime, (t) => updateSetting('morningTime', t))} />
+          <Row
+            title="שעת תזכורת הבוקר"
+            value={settings.morningTime}
+            chevron
+            onPress={() => pickTime(settings.morningTime, (t) => updateSetting('morningTime', t))}
+          />
         ) : null}
       </Group>
 
@@ -112,7 +138,11 @@ export default function SettingsScreen({ navigation }) {
         {settings.quietEnabled ? (
           <Row title="עד" value={settings.quietTo} chevron onPress={() => pickTime(settings.quietTo, (t) => updateSetting('quietTo', t))} />
         ) : null}
-        <Row icon="flame-outline" title="בלי התראות בשבת" trailing={<Toggle value={!!settings.quietShabbat} onValueChange={(v) => updateSetting('quietShabbat', v)} />} />
+        <Row
+          icon="flame-outline"
+          title="בלי התראות בשבת"
+          trailing={<Toggle value={!!settings.quietShabbat} onValueChange={(v) => updateSetting('quietShabbat', v)} />}
+        />
       </Group>
 
       <BehaviorSection />
@@ -122,7 +152,12 @@ export default function SettingsScreen({ navigation }) {
       </View>
 
       <Group title="יומן Google" footer="קריאה בלבד מהיומנים שמסונכרנים לטלפון. סימון V נשמר רק כאן ולא נכתב ליומן.">
-        <Row icon="calendar-outline" iconColor="#4C8DFF" title="הצגת אירועים מהיומן" trailing={<Toggle value={!!settings.calendarEnabled} onValueChange={toggleCalendar} />} />
+        <Row
+          icon="calendar-outline"
+          iconColor="#4C8DFF"
+          title="הצגת אירועים מהיומן"
+          trailing={<Toggle value={!!settings.calendarEnabled} onValueChange={toggleCalendar} />}
+        />
         {settings.calendarEnabled
           ? calendars.map((c) => (
               <Row
@@ -140,11 +175,17 @@ export default function SettingsScreen({ navigation }) {
       <PanmatzSection />
 
       <Group title="ווידג'ט" footer="לחיצה ארוכה על מסך הבית ← ווידג'טים ← My Day. הווידג'ט מתעדכן לבד, וגם בכל פתיחה של האפליקציה.">
-        <Row icon="color-palette-outline" title="עיצוב והתאמת הווידג'ט" subtitle="רקע, תמונה, צבעים, מה מוצג ומה קורה כשאין משימות" chevron onPress={() => navigation.navigate('WidgetEditor')} />
+        <Row
+          icon="color-palette-outline"
+          title="עיצוב והתאמת הווידג'ט"
+          subtitle="רקע, תמונה, צבעים, מה מוצג ומה קורה כשאין משימות"
+          chevron
+          onPress={() => navigation.navigate('WidgetEditor')}
+        />
         <Row icon="refresh-outline" title="רענון הווידג'ט עכשיו" chevron onPress={() => refreshWidget()} />
       </Group>
 
-      <Text style={styles.version}>My Day · גרסה {Constants.expoConfig?.version || '1.0.0'}</Text>
+      <UpdatesSection />
 
       <CategorySheet category={editCat} onClose={() => setEditCat(null)} />
     </Screen>
@@ -161,20 +202,31 @@ function BehaviorSection() {
       <View style={styles.appearance}>
         <Text style={styles.subLabel}>משימות שבוצעו</Text>
         <Chips
-          options={[{ value: 'inline', label: 'במקום' }, { value: 'bottom', label: 'בסוף הרשימה' }, { value: 'hide', label: 'להסתיר' }]}
+          options={[
+            { value: 'inline', label: 'במקום' },
+            { value: 'bottom', label: 'בסוף הרשימה' },
+            { value: 'hide', label: 'להסתיר' },
+          ]}
           value={doneItems}
           onChange={(v) => setTheme({ doneItems: v })}
         />
         <Text style={styles.subLabel}>סדר המשימות</Text>
         <Chips
-          options={[{ value: 'auto', label: 'אוטומטי לפי שעה' }, { value: 'manual', label: 'ידני (בגרירה)' }]}
+          options={[
+            { value: 'auto', label: 'אוטומטי לפי שעה' },
+            { value: 'manual', label: 'ידני (בגרירה)' },
+          ]}
           value={sortMode}
           onChange={(v) => setTheme({ sortMode: v })}
         />
         <Text style={styles.hintText}>בסדר ידני: כפתור "סידור" במסך היום, ואז גוררים. לחיצה ארוכה על משימה מעבירה אותה להיום או למחר.</Text>
         <Text style={styles.subLabel}>המסך שנפתח</Text>
         <Chips
-          options={[{ value: 'Today', label: 'היום' }, { value: 'Week', label: 'שבוע' }, { value: 'Month', label: 'חודש' }]}
+          options={[
+            { value: 'Today', label: 'היום' },
+            { value: 'Week', label: 'שבוע' },
+            { value: 'Month', label: 'חודש' },
+          ]}
           value={startTab}
           onChange={(v) => setTheme({ startTab: v })}
         />
@@ -261,7 +313,16 @@ function AppearanceSection() {
             accessibilityState={{ selected: isCustom }}
             accessibilityLabel="צבע משלי"
           >
-            <View style={[styles.accentDot, styles.customDot, isCustom && { backgroundColor: custom, borderColor: colors.ink }]}>
+            <View
+              style={[
+                styles.accentDot,
+                styles.customDot,
+                isCustom && {
+                  backgroundColor: custom,
+                  borderColor: colors.ink,
+                },
+              ]}
+            >
               <Ionicons name={isCustom ? 'checkmark' : 'color-palette'} size={20} color={isCustom ? '#FFFFFF' : colors.ink2} />
             </View>
             <Text style={[styles.accentName, isCustom && styles.accentNameOn]}>צבע משלי</Text>
@@ -274,7 +335,11 @@ function AppearanceSection() {
 
         <Text style={styles.subLabel}>גופן</Text>
         <Chips
-          options={FONTS.map((f) => ({ value: f.id, label: f.name, family: f.bold }))}
+          options={FONTS.map((f) => ({
+            value: f.id,
+            label: f.name,
+            family: f.bold,
+          }))}
           value={fontId}
           onChange={(v) => change({ font: v })}
           fontFor={(o) => o.family}
@@ -290,7 +355,26 @@ function AppearanceSection() {
   );
 }
 
+// פנמ"צ אופציונלי: מי שלא משתמש בו רואה רק מתג אחד
 function PanmatzSection() {
+  const { user, settings, updateSetting } = useAppState();
+  const enabled = settings.panmatzEnabled ?? !!user;
+  return (
+    <>
+      <Group footer={enabled ? null : 'למי שמשתמש גם באפליקציית פנמ"צ — האימונים יופיעו כאן וסימון בצד אחד יתעדכן בשני.'}>
+        <Row
+          icon="barbell-outline"
+          iconColor={PANMATZ_CATEGORY.color}
+          title='סנכרון עם פנמ"צ'
+          trailing={<Toggle value={enabled} onValueChange={(v) => updateSetting('panmatzEnabled', v)} />}
+        />
+      </Group>
+      {enabled ? <PanmatzAccount /> : null}
+    </>
+  );
+}
+
+function PanmatzAccount() {
   const styles = useStyles(makeStyles);
   const { user } = useAppState();
   const [email, setEmail] = useState('');
@@ -321,27 +405,36 @@ function PanmatzSection() {
   if (user) {
     const err = getLastSyncError();
     return (
-      <Group title='סנכרון פנמ"צ' footer={msg?.text || (err ? `הסנכרון האחרון נכשל: ${authErrorText(err)}` : 'אימונים ומטרות מפנמ"צ מופיעים כאן, וסימון בכל צד מתעדכן בשני.')}>
+      <Group
+        title='סנכרון פנמ"צ'
+        footer={msg?.text || (err ? `הסנכרון האחרון נכשל: ${authErrorText(err)}` : 'אימונים ומטרות מפנמ"צ מופיעים כאן, וסימון בכל צד מתעדכן בשני.')}
+      >
         <Row icon="cloud-done-outline" iconColor={PANMATZ_CATEGORY.color} title="מחובר" subtitle={user.email} />
         <Row
           icon="sync-outline"
           title="סנכרון עכשיו"
           trailing={busy ? <ActivityIndicator color={colors.brand} /> : null}
-          onPress={() => run(async () => {
-            await syncPanmatz();
-            await fullRefresh();
-            setMsg({ text: getLastSyncError() ? `נכשל: ${authErrorText(getLastSyncError())}` : 'מסונכרן ✓' });
-          })}
+          onPress={() =>
+            run(async () => {
+              await syncPanmatz();
+              await fullRefresh();
+              setMsg({
+                text: getLastSyncError() ? `נכשל: ${authErrorText(getLastSyncError())}` : 'מסונכרן ✓',
+              });
+            })
+          }
         />
         <Row
           icon="log-out-outline"
           title="התנתקות"
           danger
-          onPress={() => run(async () => {
-            await signOut();
-            await clearPanmatz();
-            await afterChange();
-          })}
+          onPress={() =>
+            run(async () => {
+              await signOut();
+              await clearPanmatz();
+              await afterChange();
+            })
+          }
         />
       </Group>
     );
@@ -358,46 +451,132 @@ function PanmatzSection() {
         <Button
           title={busy ? 'רגע…' : 'התחברות'}
           disabled={busy || !email || !password}
-          onPress={() => run(async () => {
-            await signIn(email, password);
-            await fullRefresh();
-          })}
+          onPress={() =>
+            run(async () => {
+              await signIn(email, password);
+              await fullRefresh();
+            })
+          }
         />
         <Button
           title="אין לי חשבון — הרשמה"
           kind="soft"
           disabled={busy || !email || password.length < 6}
-          onPress={() => run(async () => {
-            const r = await signUp(email, password);
-            if (!r.session) setMsg({ text: 'נשלח אימייל אישור. אשר אותו ואז לחץ "התחברות".' });
-            else await fullRefresh();
-          })}
+          onPress={() =>
+            run(async () => {
+              const r = await signUp(email, password);
+              if (!r.session)
+                setMsg({
+                  text: 'נשלח אימייל אישור. אשר אותו ואז לחץ "התחברות".',
+                });
+              else await fullRefresh();
+            })
+          }
         />
       </View>
     </View>
   );
 }
 
-const makeStyles = () => StyleSheet.create({
-  inlineBlock: { gap: space[2] },
-  hintText: { ...text.caption, textAlign: 'left' },
-  appearance: { backgroundColor: colors.card, borderRadius: 24, padding: space[4], gap: space[3] },
-  modeRow: { flexDirection: 'row', gap: space[2], backgroundColor: colors.sunken, borderRadius: 16, padding: 4 },
-  modeBtn: { flex: 1, height: 42, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  modeBtnOn: { backgroundColor: colors.brand },
-  modeText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink2 },
-  modeTextOn: { color: colors.onBrand },
-  subLabel: { ...text.caption, fontFamily: font.bold, color: colors.ink2, textAlign: 'left', marginTop: space[1] },
-  accents: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
-  accentItem: { alignItems: 'center', gap: 4, minWidth: 48 },
-  accentDot: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'transparent' },
-  customDot: { backgroundColor: colors.sunken, borderColor: colors.line },
-  accentName: { ...text.caption },
-  accentNameOn: { color: colors.ink, fontFamily: font.bold },
-  inlineLabel: { ...text.caption, fontFamily: font.bold, color: colors.ink2, paddingHorizontal: space[2], textAlign: 'left' },
-  authCard: { backgroundColor: colors.sunken, borderRadius: 24, padding: space[4], gap: space[3] },
-  authHint: { ...text.sub, textAlign: 'left' },
-  authMsg: { ...text.sub, color: colors.success, textAlign: 'left' },
-  authErr: { color: colors.missed },
-  version: { ...text.caption, textAlign: 'center', marginTop: space[4] },
-});
+// עדכונים: גרסה, בדיקה ידנית, הפעלה ו"מה חדש"
+function UpdatesSection() {
+  const { status, checkedAt } = useUpdateState();
+  const [news, setNews] = useState(false);
+  const built = currentBuildDate();
+  const builtText = built
+    ? `עודכן ${built.toLocaleDateString('he-IL', { day: 'numeric', month: 'long' })} ${built.toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })}`
+    : null;
+  const STATUS = {
+    checking: 'בודק…',
+    downloading: 'מוריד עדכון…',
+    ready: 'עדכון מוכן — לחיצה להפעלה',
+    uptodate: 'יש לך את הגרסה האחרונה ✓',
+    error: 'הבדיקה נכשלה — אין חיבור?',
+    disabled: 'לא זמין בגרסת פיתוח',
+  };
+  const busy = status === 'checking' || status === 'downloading';
+  return (
+    <>
+      <Group title="עדכונים" footer="עדכונים נבדקים לבד בכל פתיחה וגם ברקע. כשיש עדכון חדש מקבלים התראה.">
+        <Row icon="information-circle-outline" title={`My Day · גרסה ${Constants.expoConfig?.version || '1.0.0'}`} subtitle={builtText} />
+        <Row
+          icon={status === 'ready' ? 'sparkles' : 'cloud-download-outline'}
+          title={status === 'ready' ? 'הפעלת העדכון' : 'בדיקת עדכונים'}
+          subtitle={STATUS[status] || (checkedAt ? null : 'בודק אם יש גרסה חדשה')}
+          trailing={busy ? <ActivityIndicator color={colors.brand} /> : null}
+          onPress={busy || !updatesEnabled() ? undefined : () => (status === 'ready' ? applyUpdate().catch(() => {}) : checkForUpdate())}
+        />
+        <Row icon="gift-outline" title="מה חדש" chevron onPress={() => setNews(true)} />
+      </Group>
+      <WhatsNewSheet visible={news} onClose={() => setNews(false)} all />
+    </>
+  );
+}
+
+const makeStyles = () =>
+  StyleSheet.create({
+    inlineBlock: { gap: space[2] },
+    hintText: { ...text.caption, textAlign: 'left' },
+    appearance: {
+      backgroundColor: colors.card,
+      borderRadius: 24,
+      padding: space[4],
+      gap: space[3],
+    },
+    modeRow: {
+      flexDirection: 'row',
+      gap: space[2],
+      backgroundColor: colors.sunken,
+      borderRadius: 16,
+      padding: 4,
+    },
+    modeBtn: {
+      flex: 1,
+      height: 42,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    modeBtnOn: { backgroundColor: colors.brand },
+    modeText: { fontFamily: font.bold, fontSize: fs(15), color: colors.ink2 },
+    modeTextOn: { color: colors.onBrand },
+    subLabel: {
+      ...text.caption,
+      fontFamily: font.bold,
+      color: colors.ink2,
+      textAlign: 'left',
+      marginTop: space[1],
+    },
+    accents: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
+    accentItem: { alignItems: 'center', gap: 4, minWidth: 48 },
+    accentDot: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 3,
+      borderColor: 'transparent',
+    },
+    customDot: { backgroundColor: colors.sunken, borderColor: colors.line },
+    accentName: { ...text.caption },
+    accentNameOn: { color: colors.ink, fontFamily: font.bold },
+    inlineLabel: {
+      ...text.caption,
+      fontFamily: font.bold,
+      color: colors.ink2,
+      paddingHorizontal: space[2],
+      textAlign: 'left',
+    },
+    authCard: {
+      backgroundColor: colors.sunken,
+      borderRadius: 24,
+      padding: space[4],
+      gap: space[3],
+    },
+    authHint: { ...text.sub, textAlign: 'left' },
+    authMsg: { ...text.sub, color: colors.success, textAlign: 'left' },
+    authErr: { color: colors.missed },
+  });

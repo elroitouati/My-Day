@@ -2,32 +2,19 @@
 // שימו לב: הווידג'ט מרונדר תמיד משמאל לימין, ולכן הסדר כאן "הפוך" —
 // מה שכתוב ראשון מופיע בצד שמאל, כדי שהתוצאה תיראה RTL מלא.
 // כל העיצוב נשלט מהעדפות הווידג'ט (src/widget/prefs.js) — ראו עורך הווידג'ט באפליקציה.
-import React from "react";
-import {
-  FlexWidget,
-  TextWidget,
-  ListWidget,
-  SvgWidget,
-  OverlapWidget,
-  ImageWidget,
-} from "react-native-android-widget";
-import {
-  formatDayTitle,
-  formatHebDate,
-  formatTimeRange,
-  HEB_WEEKDAYS_FULL,
-  weekday,
-} from "../logic/dates";
-import { buildPalette } from "../design/tokens";
-import { WIDGET_DEFAULTS } from "./prefs";
+import React from 'react';
+import { FlexWidget, TextWidget, ListWidget, SvgWidget, OverlapWidget, ImageWidget } from 'react-native-android-widget';
+import { formatDayTitle, formatHebDate, formatTimeRange, HEB_WEEKDAYS_FULL, weekday } from '../logic/dates';
+import { buildPalette } from '../design/tokens';
+import { WIDGET_DEFAULTS } from './prefs';
 
 const F = {
-  regular: "Heebo-Regular",
-  medium: "Heebo-Medium",
-  bold: "Heebo-Bold",
-  heavy: "Heebo-ExtraBold",
+  regular: 'Heebo-Regular',
+  medium: 'Heebo-Medium',
+  bold: 'Heebo-Bold',
+  heavy: 'Heebo-ExtraBold',
 };
-const CLEAR = "rgba(0, 0, 0, 0)";
+const CLEAR = 'rgba(0, 0, 0, 0)';
 
 function rgba(hex, a) {
   const n = parseInt(hex.slice(1, 7), 16);
@@ -35,42 +22,35 @@ function rgba(hex, a) {
 }
 function isDarkColor(hex) {
   const n = parseInt(hex.slice(1, 7), 16);
-  return (
-    ((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114 <
-    140
-  );
+  return ((n >> 16) & 255) * 0.299 + ((n >> 8) & 255) * 0.587 + (n & 255) * 0.114 < 140;
 }
 
 // צבעי הווידג'ט: ערכת בסיס + רקע + צבע טקסט שמתאים לרקע
 export function widgetColors(prefs, app = {}) {
-  const mode = prefs.theme === "app" ? app.mode || "light" : prefs.theme;
-  const base = buildPalette(mode, app.accent || "violet");
+  const mode = prefs.theme === 'app' ? app.mode || 'light' : prefs.theme;
+  const base = buildPalette(mode, app.accent || 'violet');
   let bg;
-  if (prefs.bg === "solid") bg = base.card;
-  else if (prefs.bg === "color") bg = prefs.bgColor || base.card;
+  if (prefs.bg === 'solid') bg = base.card;
+  else if (prefs.bg === 'color') bg = prefs.bgColor || base.card;
   else bg = null; // none / image
 
   let lightText;
-  if (prefs.textColor === "light") lightText = true;
-  else if (prefs.textColor === "dark") lightText = false;
-  else if (prefs.bg === "image") lightText = true;
-  else if (prefs.bg === "color") lightText = isDarkColor(bg);
-  else lightText = base.mode === "dark";
+  if (prefs.textColor === 'light') lightText = true;
+  else if (prefs.textColor === 'dark') lightText = false;
+  else if (prefs.bg === 'image') lightText = true;
+  else if (prefs.bg === 'color') lightText = isDarkColor(bg);
+  else lightText = base.mode === 'dark';
 
   return {
-    bg: bg
-      ? prefs.opacity >= 100
-        ? bg
-        : rgba(bg, prefs.opacity / 100)
-      : CLEAR,
-    ink: lightText ? "#FFFFFF" : "#15172B",
-    ink2: lightText ? "#E4E6F2" : "#5B6078",
-    ink3: lightText ? "#C2C5D8" : "#8E93AB",
+    bg: bg ? (prefs.opacity >= 100 ? bg : rgba(bg, prefs.opacity / 100)) : CLEAR,
+    ink: lightText ? '#FFFFFF' : '#15172B',
+    ink2: lightText ? '#E4E6F2' : '#5B6078',
+    ink3: lightText ? '#C2C5D8' : '#8E93AB',
     brand: base.brand,
     onBrand: base.onBrand,
-    soft: lightText ? "rgba(255, 255, 255, 0.2)" : base.brandSoft,
-    softText: lightText ? "#FFFFFF" : base.brand,
-    track: lightText ? "rgba(255, 255, 255, 0.25)" : base.sunken,
+    soft: lightText ? 'rgba(255, 255, 255, 0.2)' : base.brandSoft,
+    softText: lightText ? '#FFFFFF' : base.brand,
+    track: lightText ? 'rgba(255, 255, 255, 0.25)' : base.sunken,
     ring: CLEAR,
   };
 }
@@ -100,8 +80,8 @@ function Check({ item, C, z, pop }) {
       style={{
         width: Math.round(42 * z),
         height: Math.round(42 * z),
-        alignItems: "center",
-        justifyContent: "center",
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       <FlexWidget
@@ -110,8 +90,8 @@ function Check({ item, C, z, pop }) {
           height: halo,
           borderRadius: halo / 2,
           backgroundColor: pop && item.done ? rgba(item.color, 0.28) : CLEAR,
-          alignItems: "center",
-          justifyContent: "center",
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
         <FlexWidget
@@ -122,13 +102,13 @@ function Check({ item, C, z, pop }) {
             backgroundColor: item.done ? item.color : C.ring,
             borderWidth: item.done ? 0 : 2,
             borderColor: item.color,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           {item.done ? (
             <SvgWidget
-              svg={checkSvg("#FFFFFF")}
+              svg={checkSvg('#FFFFFF')}
               style={{
                 width: Math.round((pop ? 20 : 17) * z),
                 height: Math.round((pop ? 20 : 17) * z),
@@ -142,22 +122,17 @@ function Check({ item, C, z, pop }) {
 }
 
 function Row({ item, C, z, prefs, pop }) {
-  const meta = [
-    prefs.showTime ? formatTimeRange(item.startTime, item.endTime) : null,
-    prefs.showCategory ? item.subtitle || item.categoryName : null,
-  ]
+  const meta = [prefs.showTime ? formatTimeRange(item.startTime, item.endTime) : null, prefs.showCategory ? item.subtitle || item.categoryName : null]
     .filter(Boolean)
-    .join(" · ");
-  const h = Math.round(
-    (prefs.rows === "compact" ? (meta ? 44 : 36) : meta ? 56 : 44) * z,
-  );
+    .join(' · ');
+  const h = Math.round((prefs.rows === 'compact' ? (meta ? 44 : 36) : meta ? 56 : 44) * z);
   return (
     <FlexWidget
       style={{
-        width: "match_parent",
+        width: 'match_parent',
         height: h,
-        flexDirection: "row",
-        alignItems: "center",
+        flexDirection: 'row',
+        alignItems: 'center',
         borderRadius: 14,
         backgroundColor: pop ? C.soft : CLEAR,
       }}
@@ -167,10 +142,10 @@ function Row({ item, C, z, prefs, pop }) {
         clickAction="OPEN_APP"
         style={{
           flex: 1,
-          height: "match_parent",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          justifyContent: "center",
+          height: 'match_parent',
+          flexDirection: 'column',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
           paddingLeft: 6,
           paddingRight: 10,
         }}
@@ -183,11 +158,11 @@ function Row({ item, C, z, prefs, pop }) {
             fontSize: Math.round(15 * z),
             fontFamily: item.done ? F.medium : F.bold,
             color: item.done ? C.ink3 : C.ink,
-            textAlign: "right",
+            textAlign: 'right',
           }}
         />
         {meta ? (
-          <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
+          <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
             <TextWidget
               text={meta}
               maxLines={1}
@@ -196,15 +171,10 @@ function Row({ item, C, z, prefs, pop }) {
                 fontSize: Math.round(12 * z),
                 fontFamily: F.regular,
                 color: C.ink3,
-                textAlign: "right",
+                textAlign: 'right',
               }}
             />
-            {item.source === "calendar" ? (
-              <SvgWidget
-                svg={calendarSvg(C.ink3)}
-                style={{ width: 12, height: 12, marginLeft: 4 }}
-              />
-            ) : null}
+            {item.source === 'calendar' ? <SvgWidget svg={calendarSvg(C.ink3)} style={{ width: 12, height: 12, marginLeft: 4 }} /> : null}
           </FlexWidget>
         ) : null}
       </FlexWidget>
@@ -225,18 +195,16 @@ function ProgressBar({ ratio, C }) {
   return (
     <FlexWidget
       style={{
-        width: "match_parent",
+        width: 'match_parent',
         height: 6,
         borderRadius: 3,
         backgroundColor: C.track,
-        flexDirection: "row",
+        flexDirection: 'row',
         marginTop: 8,
         marginBottom: 4,
       }}
     >
-      {fill < 1000 ? (
-        <FlexWidget style={{ flex: 1000 - fill, height: 6 }} />
-      ) : null}
+      {fill < 1000 ? <FlexWidget style={{ flex: 1000 - fill, height: 6 }} /> : null}
       {fill > 0 ? (
         <FlexWidget
           style={{
@@ -252,10 +220,9 @@ function ProgressBar({ ratio, C }) {
 }
 
 function dateText(dateKey, style, isTomorrow) {
-  if (style === "none") return null;
-  const prefix = isTomorrow ? "מחר · " : "";
-  if (style === "short")
-    return `${prefix}${isTomorrow ? "" : "יום "}${HEB_WEEKDAYS_FULL[weekday(dateKey)]}`;
+  if (style === 'none') return null;
+  const prefix = isTomorrow ? 'מחר · ' : '';
+  if (style === 'short') return `${prefix}${isTomorrow ? '' : 'יום '}${HEB_WEEKDAYS_FULL[weekday(dateKey)]}`;
   return `${prefix}${formatDayTitle(dateKey)} · ${formatHebDate(dateKey)}`;
 }
 
@@ -264,28 +231,25 @@ function Header({ C, z, prefs, stats, dateKey, isTomorrow }) {
   return (
     <FlexWidget
       style={{
-        width: "match_parent",
-        flexDirection: "row",
-        alignItems: "center",
+        width: 'match_parent',
+        flexDirection: 'row',
+        alignItems: 'center',
       }}
     >
       {prefs.showAdd ? (
         <FlexWidget
           clickAction="OPEN_URI"
-          clickActionData={{ uri: "myday://add" }}
+          clickActionData={{ uri: 'myday://add' }}
           style={{
             width: Math.round(34 * z),
             height: Math.round(34 * z),
             borderRadius: Math.round(17 * z),
             backgroundColor: C.brand,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
-          <SvgWidget
-            svg={plusSvg(C.onBrand)}
-            style={{ width: 18, height: 18 }}
-          />
+          <SvgWidget svg={plusSvg(C.onBrand)} style={{ width: 18, height: 18 }} />
         </FlexWidget>
       ) : null}
       {prefs.showCounter && stats.total ? (
@@ -296,7 +260,7 @@ function Header({ C, z, prefs, stats, dateKey, isTomorrow }) {
             height: Math.round(26 * z),
             borderRadius: 13,
             backgroundColor: C.soft,
-            justifyContent: "center",
+            justifyContent: 'center',
           }}
         >
           <TextWidget
@@ -313,8 +277,8 @@ function Header({ C, z, prefs, stats, dateKey, isTomorrow }) {
         clickAction="OPEN_APP"
         style={{
           flex: 1,
-          flexDirection: "column",
-          alignItems: "flex-end",
+          flexDirection: 'column',
+          alignItems: 'flex-end',
           paddingRight: 4,
         }}
       >
@@ -334,7 +298,7 @@ function Header({ C, z, prefs, stats, dateKey, isTomorrow }) {
               fontSize: Math.round(12 * z),
               fontFamily: F.medium,
               color: C.ink2,
-              textAlign: "right",
+              textAlign: 'right',
             }}
           />
         ) : null}
@@ -349,20 +313,17 @@ function Message({ C, z, stats }) {
     <FlexWidget
       clickAction="OPEN_APP"
       style={{
-        width: "match_parent",
-        height: "wrap_content",
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "column",
+        width: 'match_parent',
+        height: 'wrap_content',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'column',
         paddingVertical: 14,
       }}
     >
+      <TextWidget text={allDone ? '🎉' : '✨'} style={{ fontSize: Math.round(24 * z) }} />
       <TextWidget
-        text={allDone ? "🎉" : "✨"}
-        style={{ fontSize: Math.round(24 * z) }}
-      />
-      <TextWidget
-        text={allDone ? "הכל הושלם להיום!" : "אין משימות להיום"}
+        text={allDone ? 'הכל הושלם להיום!' : 'אין משימות להיום'}
         style={{
           fontSize: Math.round(15 * z),
           fontFamily: F.bold,
@@ -371,7 +332,7 @@ function Message({ C, z, stats }) {
         }}
       />
       <TextWidget
-        text={allDone ? "כל הכבוד" : "לחץ על + כדי להוסיף"}
+        text={allDone ? 'כל הכבוד' : 'לחץ על + כדי להוסיף'}
         style={{
           fontSize: Math.round(12 * z),
           fontFamily: F.regular,
@@ -382,19 +343,7 @@ function Message({ C, z, stats }) {
   );
 }
 
-export function MyDayWidget({
-  today,
-  dateKey,
-  isTomorrow = false,
-  items,
-  stats,
-  mode = "list",
-  prefs: p,
-  app,
-  pop,
-  width = 320,
-  height = 240,
-}) {
+export function MyDayWidget({ today, dateKey, isTomorrow = false, items, stats, mode = 'list', prefs: p, app, pop, width = 320, height = 240 }) {
   const prefs = { ...WIDGET_DEFAULTS, ...(p || {}) };
   const C = widgetColors(prefs, app);
   const z = SCALE[prefs.textSize] || 1;
@@ -402,55 +351,33 @@ export function MyDayWidget({
   const st = stats || { total: 0, done: 0, ratio: 0 };
 
   // "נעלם": שקוף לגמרי (לחיצה עדיין פותחת את האפליקציה)
-  if (mode === "hidden") {
+  if (mode === 'hidden') {
     return (
       <FlexWidget
         clickAction="OPEN_APP"
         style={{
-          width: "match_parent",
-          height: "match_parent",
+          width: 'match_parent',
+          height: 'match_parent',
           backgroundColor: CLEAR,
         }}
       />
     );
   }
 
-  const fit = prefs.fit === "content" && prefs.bg !== "image";
+  const fit = prefs.fit === 'content' && prefs.bg !== 'image';
   const limit = prefs.maxItems > 0 ? prefs.maxItems : items.length;
   const visible = items.slice(0, limit);
   const more = items.length - visible.length;
 
   const content = [
-    prefs.showHeader ? (
-      <Header
-        key="h"
-        C={C}
-        z={z}
-        prefs={prefs}
-        stats={st}
-        dateKey={shown}
-        isTomorrow={isTomorrow}
-      />
-    ) : null,
-    prefs.showProgress && st.total && !isTomorrow ? (
-      <ProgressBar key="p" ratio={st.ratio} C={C} />
-    ) : null,
-    mode === "message" ? (
+    prefs.showHeader ? <Header key="h" C={C} z={z} prefs={prefs} stats={st} dateKey={shown} isTomorrow={isTomorrow} /> : null,
+    prefs.showProgress && st.total && !isTomorrow ? <ProgressBar key="p" ratio={st.ratio} C={C} /> : null,
+    mode === 'message' ? (
       <Message key="m" C={C} z={z} stats={st} />
     ) : fit ? (
-      <FlexWidget
-        key="l"
-        style={{ width: "match_parent", flexDirection: "column" }}
-      >
+      <FlexWidget key="l" style={{ width: 'match_parent', flexDirection: 'column' }}>
         {visible.map((item) => (
-          <Row
-            key={item.uid}
-            item={item}
-            C={C}
-            z={z}
-            prefs={prefs}
-            pop={pop === `${item.source}:${item.id}`}
-          />
+          <Row key={item.uid} item={item} C={C} z={z} prefs={prefs} pop={pop === `${item.source}:${item.id}`} />
         ))}
         {more > 0 ? (
           <TextWidget
@@ -460,26 +387,16 @@ export function MyDayWidget({
               fontSize: Math.round(12 * z),
               fontFamily: F.bold,
               color: C.ink2,
-              textAlign: "right",
+              textAlign: 'right',
               marginTop: 2,
             }}
           />
         ) : null}
       </FlexWidget>
     ) : (
-      <ListWidget
-        key="l"
-        style={{ width: "match_parent", height: "match_parent" }}
-      >
+      <ListWidget key="l" style={{ width: 'match_parent', height: 'match_parent' }}>
         {visible.map((item) => (
-          <Row
-            key={item.uid}
-            item={item}
-            C={C}
-            z={z}
-            prefs={prefs}
-            pop={pop === `${item.source}:${item.id}`}
-          />
+          <Row key={item.uid} item={item} C={C} z={z} prefs={prefs} pop={pop === `${item.source}:${item.id}`} />
         ))}
       </ListWidget>
     ),
@@ -491,14 +408,14 @@ export function MyDayWidget({
     paddingBottom: 8,
   };
 
-  if (prefs.bg === "image" && prefs.image) {
+  if (prefs.bg === 'image' && prefs.image) {
     return (
       <OverlapWidget
         style={{
-          width: "match_parent",
-          height: "match_parent",
+          width: 'match_parent',
+          height: 'match_parent',
           borderRadius: prefs.radius,
-          overflow: "hidden",
+          overflow: 'hidden',
         }}
       >
         <ImageWidget
@@ -506,21 +423,21 @@ export function MyDayWidget({
           imageWidth={width}
           imageHeight={height}
           radius={prefs.radius}
-          style={{ width: "match_parent", height: "match_parent" }}
+          style={{ width: 'match_parent', height: 'match_parent' }}
         />
         <FlexWidget
           style={{
-            width: "match_parent",
-            height: "match_parent",
+            width: 'match_parent',
+            height: 'match_parent',
             borderRadius: prefs.radius,
             backgroundColor: `rgba(0, 0, 0, ${prefs.imageDim / 100})`,
           }}
         />
         <FlexWidget
           style={{
-            width: "match_parent",
-            height: "match_parent",
-            flexDirection: "column",
+            width: 'match_parent',
+            height: 'match_parent',
+            flexDirection: 'column',
             ...pad,
           }}
         >
@@ -533,9 +450,9 @@ export function MyDayWidget({
   const card = (
     <FlexWidget
       style={{
-        width: "match_parent",
-        height: fit ? "wrap_content" : "match_parent",
-        flexDirection: "column",
+        width: 'match_parent',
+        height: fit ? 'wrap_content' : 'match_parent',
+        flexDirection: 'column',
         backgroundColor: C.bg,
         borderRadius: prefs.radius,
         ...pad,
@@ -549,9 +466,9 @@ export function MyDayWidget({
   return (
     <FlexWidget
       style={{
-        width: "match_parent",
-        height: "match_parent",
-        flexDirection: "column",
+        width: 'match_parent',
+        height: 'match_parent',
+        flexDirection: 'column',
         backgroundColor: CLEAR,
       }}
     >
@@ -564,7 +481,7 @@ export function MyDayWidget({
 export function sampleItems(dateKey) {
   const mk = (id, title, color, startTime, endTime, categoryName, done) => ({
     uid: `sample-${id}`,
-    source: "task",
+    source: 'task',
     id: `sample-${id}`,
     date: dateKey,
     title,
@@ -575,9 +492,9 @@ export function sampleItems(dateKey) {
     done,
   });
   return [
-    mk(1, "שתיית 8 כוסות מים", "#10C77F", null, null, "בריאות", true),
-    mk(2, "שיעור מתמטיקה", "#8B5CF6", "10:00", "11:30", "לימודים", false),
-    mk(3, "אימון כוח", "#E0A100", "17:00", null, 'פנמ"צ', false),
-    mk(4, "לסדר את החדר", "#FF8A00", "18:00", "18:30", "בית", false),
+    mk(1, 'שתיית 8 כוסות מים', '#10C77F', null, null, 'בריאות', true),
+    mk(2, 'שיעור מתמטיקה', '#8B5CF6', '10:00', '11:30', 'לימודים', false),
+    mk(3, 'אימון כוח', '#E0A100', '17:00', null, 'פנמ"צ', false),
+    mk(4, 'לסדר את החדר', '#FF8A00', '18:00', '18:30', 'בית', false),
   ];
 }

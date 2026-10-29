@@ -1,8 +1,8 @@
 // משוב כשמסמנים V בווידג'ט: רטט קצר ו/או צליל. עובד גם כשהאפליקציה סגורה.
-import { Vibration } from "react-native";
-import { Audio } from "expo-av";
+import { Vibration } from 'react-native';
+import { Audio } from 'expo-av';
 
-const CHECK_SOUND = require("../../assets/sounds/check.wav");
+const CHECK_SOUND = require('../../assets/sounds/check.wav');
 
 export function checkFeedback(prefs, done) {
   if (prefs.haptic) {
@@ -24,6 +24,6 @@ export async function playCheckSound() {
       if (s.didJustFinish) sound.unloadAsync().catch(() => {});
     });
   } catch (e) {
-    console.warn("צליל הסימון נכשל", e);
+    console.warn('צליל הסימון נכשל', e);
   }
 }

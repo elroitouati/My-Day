@@ -1,14 +1,15 @@
 // משימת רקע תקופתית (בערך כל 15 דקות, לפי מה שאנדרואיד מאפשר):
-// מושכת שינויים מפנמ"צ, מרעננת את היומן, מתזמנת התראות ומעדכנת את הווידג'ט.
+// מושכת שינויים מפנמ"צ, מרעננת את היומן, מתזמנת התראות, מעדכנת את הווידג'ט ובודקת עדכונים.
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
 import { fullRefresh } from './refresh';
+import { backgroundUpdateCheck } from './updates';
 
 export const BACKGROUND_TASK = 'my-day-background-refresh';
 
 TaskManager.defineTask(BACKGROUND_TASK, async () => {
   try {
-    await fullRefresh();
+    await Promise.allSettled([fullRefresh(), backgroundUpdateCheck()]);
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch {
     return BackgroundFetch.BackgroundFetchResult.Failed;

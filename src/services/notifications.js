@@ -41,6 +41,11 @@ export function setupNotifications() {
           vibrationPattern: [0, 180, 120, 180],
           lightColor: colors.brand,
         });
+        await Notifications.setNotificationChannelAsync('updates', {
+          name: 'עדכונים לאפליקציה',
+          importance: Notifications.AndroidImportance.DEFAULT,
+          lightColor: colors.brand,
+        });
         await Notifications.setNotificationChannelAsync('evening', {
           name: 'תזכורות בוקר וערב',
           importance: Notifications.AndroidImportance.DEFAULT,
@@ -103,7 +108,12 @@ async function rescheduleNow() {
   const byDate = await loadRange(today, end);
   const now = Date.now() + 5000;
   let taskCount = 0;
-  const quiet = { enabled: settings.quietEnabled, from: settings.quietFrom, to: settings.quietTo, shabbat: settings.quietShabbat };
+  const quiet = {
+    enabled: settings.quietEnabled,
+    from: settings.quietFrom,
+    to: settings.quietTo,
+    shabbat: settings.quietShabbat,
+  };
   const allowed = (ms) => ms > now && !inQuietHours(new Date(ms), quiet); // בלי התראות בשעות השקט
 
   for (const date of rangeKeys(today, end)) {
@@ -135,7 +145,11 @@ async function rescheduleNow() {
       if (allowed(at) && open > 0) {
         await Notifications.scheduleNotificationAsync({
           identifier: `morning:${date}`,
-          content: { title: 'בוקר טוב ☀️', body: morningBody(open), data: { type: 'morning', date } },
+          content: {
+            title: 'בוקר טוב ☀️',
+            body: morningBody(open),
+            data: { type: 'morning', date },
+          },
           trigger: { date: new Date(at), channelId: 'evening' },
         });
       }
@@ -147,7 +161,11 @@ async function rescheduleNow() {
       if (allowed(at) && open > 0) {
         await Notifications.scheduleNotificationAsync({
           identifier: `evening:${date}`,
-          content: { title: 'My Day', body: eveningBody(open), data: { type: 'evening', date } },
+          content: {
+            title: 'My Day',
+            body: eveningBody(open),
+            data: { type: 'evening', date },
+          },
           trigger: { date: new Date(at), channelId: 'evening' },
         });
       }

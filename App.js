@@ -26,6 +26,9 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import DayScreen from './src/screens/DayScreen';
 import WidgetEditorScreen from './src/screens/WidgetEditorScreen';
 import UpdateBanner from './src/components/UpdateBanner';
+import Onboarding from './src/onboarding/Onboarding';
+import WhatsNewSheet from './src/sheets/WhatsNewSheet';
+import { LATEST_CHANGES } from './src/changelog';
 import { registerBackgroundTask } from './src/services/background';
 import { setupNotifications, requestNotificationPermission, rescheduleNotifications } from './src/services/notifications';
 import { getSettings, setSetting } from './src/db/repo';
@@ -43,7 +46,14 @@ const Stack = createNativeStackNavigator();
 const navThemeFor = () => ({
   ...DefaultTheme,
   dark: colors.mode === 'dark',
-  colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.card, primary: colors.brand, text: colors.ink, border: colors.line },
+  colors: {
+    ...DefaultTheme.colors,
+    background: colors.bg,
+    card: colors.card,
+    primary: colors.brand,
+    text: colors.ink,
+    border: colors.line,
+  },
 });
 
 function Tabs() {
@@ -65,7 +75,9 @@ function DeepLinks() {
     const handle = (url) => {
       if (url && url.includes('add')) openTaskSheet({ date: today });
     };
-    Linking.getInitialURL().then(handle).catch(() => {});
+    Linking.getInitialURL()
+      .then(handle)
+      .catch(() => {});
     const sub = Linking.addEventListener('url', (e) => handle(e.url));
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,12 +88,25 @@ function DeepLinks() {
 export default function App() {
   // כל הגופנים לבחירה ב"מראה" נטענים מראש, כדי שהחלפה תהיה מיידית
   const [fontsLoaded, fontError] = useFonts({
-    Heebo_400Regular, Heebo_500Medium, Heebo_700Bold, Heebo_800ExtraBold,
-    Rubik_400Regular, Rubik_500Medium, Rubik_700Bold, Rubik_800ExtraBold,
-    Assistant_400Regular, Assistant_600SemiBold, Assistant_700Bold, Assistant_800ExtraBold,
+    Heebo_400Regular,
+    Heebo_500Medium,
+    Heebo_700Bold,
+    Heebo_800ExtraBold,
+    Rubik_400Regular,
+    Rubik_500Medium,
+    Rubik_700Bold,
+    Rubik_800ExtraBold,
+    Assistant_400Regular,
+    Assistant_600SemiBold,
+    Assistant_700Bold,
+    Assistant_800ExtraBold,
     VarelaRound_400Regular,
-    FrankRuhlLibre_400Regular, FrankRuhlLibre_500Medium, FrankRuhlLibre_700Bold, FrankRuhlLibre_900Black,
-    AmaticSC_400Regular, AmaticSC_700Bold,
+    FrankRuhlLibre_400Regular,
+    FrankRuhlLibre_500Medium,
+    FrankRuhlLibre_700Bold,
+    FrankRuhlLibre_900Black,
+    AmaticSC_400Regular,
+    AmaticSC_700Bold,
   });
   const [theme, setTheme] = useState(null);
 
@@ -92,8 +117,8 @@ export default function App() {
       setTheme(themeFromSettings(s));
       await setupNotifications().catch(() => {});
       registerBackgroundTask();
-      // בפתיחה הראשונה בלבד — בקשת הרשאת התראות (אנדרואיד 13+)
-      if (!s.askedNotifications) {
+      // משתמש ותיק שלא עבר במסך הפתיחה — בקשת הרשאת התראות (אנדרואיד 13+). חדשים מאשרים במסך הפתיחה.
+      if (s.onboarded && !s.askedNotifications) {
         await setSetting('askedNotifications', true);
         if (await requestNotificationPermission().catch(() => false)) rescheduleNotifications();
       }
@@ -131,7 +156,13 @@ function Root({ onReady }) {
         <AppStateProvider>
           <View style={styles.root}>
             <NavigationContainer theme={navTheme}>
-              <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'fade_from_bottom' }}>
+              <Stack.Navigator
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: colors.bg },
+                  animation: 'fade_from_bottom',
+                }}
+              >
                 <Stack.Screen name="Tabs" component={Tabs} />
                 <Stack.Screen name="Day" component={DayScreen} options={{ animation: 'slide_from_left' }} />
                 <Stack.Screen name="WidgetEditor" component={WidgetEditorScreen} options={{ animation: 'slide_from_left' }} />
@@ -140,6 +171,7 @@ function Root({ onReady }) {
             <TaskSheet />
             <DeepLinks />
             <UpdateBanner />
+            <FirstRun />
           </View>
         </AppStateProvider>
       </SafeAreaProvider>
@@ -147,6 +179,38 @@ function Root({ onReady }) {
   );
 }
 
-const makeStyles = () => StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-});
+// פתיחה ראשונה — מסך פתיחה. אחרי עדכון — "מה חדש" פעם אחת.
+function FirstRun() {
+  const { settings, reloadMeta } = useAppState();
+  const [done, setDone] = useState(false);
+  const [news, setNews] = useState(false);
+  useEffect(() => {
+    if (settings && settings.onboarded && settings.seenChangelog !== LATEST_CHANGES.id) setNews(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.onboarded]);
+  if (!settings) return null;
+  if (!settings.onboarded && !done) {
+    return (
+      <Onboarding
+        onDone={() => {
+          setDone(true);
+          reloadMeta();
+        }}
+      />
+    );
+  }
+  return (
+    <WhatsNewSheet
+      visible={news}
+      onClose={() => {
+        setNews(false);
+        setSetting('seenChangelog', LATEST_CHANGES.id);
+      }}
+    />
+  );
+}
+
+const makeStyles = () =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.bg },
+  });
