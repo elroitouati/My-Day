@@ -19,7 +19,8 @@ export const DEFAULT_THEME = {
   doneItems: 'inline', // inline | bottom | hide
   sortMode: 'auto', // auto | manual
   startTab: 'Today',
-  importantStyle: 'glow', // glow | badge | bold — איך משימה חשובה נראית
+  importantStyle: 'outline', // outline | soft | solid — איך משימה חשובה נראית
+  importantColor: '#E5484D', // צבע החשיבות — אדום כברירת מחדל
 };
 
 export function ThemeProvider({ initial, children }) {

@@ -60,8 +60,8 @@ const DARK = {
   sheetScrim: '#05060C',
 };
 
-// ערבוב שני צבעי hex (t = כמה מהצבע השני)
-function mix(a, b, t) {
+// ערבוב שני צבעי hex (t = כמה מ-b) — צבע אטום, בלי שקיפות מעל צל (שמייצרת "מלבן" באנדרואיד)
+export function mix(a, b, t) {
   const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   const [x, y] = [p(a), p(b)];
   return `#${x
@@ -230,6 +230,9 @@ applyTheme({});
 
 // צבע הכוכב של משימה חשובה
 export const STAR = '#F5A623';
+// צבע ברירת המחדל של משימה חשובה (ניתן לשינוי בהגדרות ← מראה)
+export const IMPORTANT_RED = '#E5484D';
+
 
 // פלטת צבעים חיים לקטגוריות
 export const PALETTE = ['#FF4D6D', '#FF8A00', '#FFC300', '#10C77F', '#00B8D9', '#3A86FF', '#6C5CFF', '#8B5CF6', '#FF4FBF', '#7CB518', '#FF6B3D', '#14B8A6'];

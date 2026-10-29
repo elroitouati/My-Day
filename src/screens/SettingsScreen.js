@@ -19,7 +19,7 @@ import { supabaseConfigured, signIn, signUp, signOut, authErrorText } from '../s
 import { syncPanmatz, getLastSyncError } from '../services/panmatzSync';
 import { clearPanmatz } from '../db/repo';
 import { PANMATZ_CATEGORY, UNCATEGORIZED } from '../logic/dayItems';
-import { STAR, colors, space, text, font, ACCENTS, TAB_STYLES, FONTS, TEXT_SIZES, DENSITIES, fs } from '../design/tokens';
+import { colors, space, text, font, ACCENTS, TAB_STYLES, FONTS, TEXT_SIZES, DENSITIES, fs } from '../design/tokens';
 import { useStyles, useTheme } from '../state/Theme';
 import { haptic } from '../design/feedback';
 import WhatsNewSheet from '../sheets/WhatsNewSheet';
@@ -256,7 +256,7 @@ function BehaviorSection() {
 // מראה: בהיר/כהה, צבע מותג וסגנון סרגל הטאבים. הגופנים והמבנה לא משתנים.
 function AppearanceSection() {
   const styles = useStyles(makeStyles);
-  const { mode, accent, tabStyle, font: fontId, textSize, density, importantStyle, setTheme } = useTheme();
+  const { mode, accent, tabStyle, font: fontId, textSize, density, importantStyle, importantColor, setTheme } = useTheme();
   const isCustom = accent.startsWith('#');
   const [customOpen, setCustomOpen] = useState(false); // הבוחר המלא נפתח רק בלחיצה
   const [custom, setCustom] = useState(isCustom ? accent : '#6C5CFF');
@@ -349,10 +349,16 @@ function AppearanceSection() {
         <Chips options={TAB_STYLES.map((t) => ({ value: t.id, label: t.name }))} value={tabStyle} onChange={(v) => change({ tabStyle: v })} />
 
         <Text style={styles.subLabel}>משימה חשובה</Text>
-        <Chips options={IMPORTANT_STYLES.map((t) => ({ value: t.id, label: t.name }))} value={importantStyle} onChange={(v) => change({ importantStyle: v })} />
+        <Chips
+          options={IMPORTANT_STYLES.map((t) => ({ value: t.id, label: t.name }))}
+          value={{ glow: 'outline', badge: 'soft', bold: 'solid' }[importantStyle] || importantStyle}
+          onChange={(v) => change({ importantStyle: v })}
+        />
         <View pointerEvents="none" style={styles.previewCard}>
-          <TaskCard item={PREVIEW_IMPORTANT} importantStyle={importantStyle} onToggle={() => {}} />
+          <TaskCard item={PREVIEW_IMPORTANT} importantStyle={importantStyle} importantColor={importantColor} onToggle={() => {}} />
         </View>
+        <Text style={styles.subLabel}>צבע משימה חשובה</Text>
+        <ColorPicker value={importantColor} onChange={(c) => change({ importantColor: c })} allowNone={false} />
 
         <Text style={styles.subLabel}>גופן</Text>
         <Chips
@@ -509,10 +515,12 @@ const PREVIEW_IMPORTANT = {
   color: '#3A86FF',
   important: true,
   done: false,
+  task: { alarms: '[15,0]' },
 };
 
 // צלצול למשימות חשובות: צליל, ניסיון, והרשאות שצריך בשביל מסך מלא ותזמון מדויק
 function ImportantAlarmsSection() {
+  const { importantColor } = useTheme();
   const [sound, setSound] = useState(null);
   const [perms, setPerms] = useState({ full: true, exact: true });
   const refresh = useCallback(() => {
@@ -529,7 +537,7 @@ function ImportantAlarmsSection() {
   if (!alarmsAvailable()) {
     return (
       <Group title="משימות חשובות — צלצול" footer="הצלצול דורש את הגרסה החדשה של האפליקציה (קובץ APK). משימות חשובות עדיין מודגשות ומופיעות למעלה.">
-        <Row icon="alarm-outline" iconColor={STAR} title="צלצול לא זמין בגרסה הזו" />
+        <Row icon="alarm-outline" iconColor={importantColor} title="צלצול לא זמין בגרסה הזו" />
       </Group>
     );
   }
@@ -540,7 +548,7 @@ function ImportantAlarmsSection() {
     >
       <Row
         icon="musical-notes-outline"
-        iconColor={STAR}
+        iconColor={importantColor}
         title="צליל"
         value={sound?.title || 'ברירת מחדל'}
         chevron
@@ -550,7 +558,7 @@ function ImportantAlarmsSection() {
         }}
       />
       {sound?.uri ? <Row icon="refresh-outline" title="חזרה לצליל ברירת המחדל" onPress={() => setSound(resetAlarmSound())} /> : null}
-      <Row icon="play-circle-outline" iconColor={STAR} title="נסה צלצול עכשיו" chevron onPress={() => testAlarm(colors.brand)} />
+      <Row icon="play-circle-outline" iconColor={importantColor} title="נסה צלצול עכשיו" chevron onPress={() => testAlarm(importantColor)} />
       {!perms.full ? (
         <Row icon="warning-outline" danger title="לאשר הצגה במסך מלא" subtitle="בלי זה הצלצול יופיע רק כהתראה" chevron onPress={openFullScreenSettings} />
       ) : null}

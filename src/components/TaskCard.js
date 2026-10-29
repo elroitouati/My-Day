@@ -4,31 +4,36 @@ import { View, Text, Pressable, StyleSheet } from 'react-native';
 import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import CheckCircle from './CheckCircle';
-import { colors, radius, shadow, space, text, tint, fs, font, layout, STAR, onColor } from '../design/tokens';
+import { colors, radius, shadow, space, text, tint, fs, font, layout, onColor, mix, IMPORTANT_RED } from '../design/tokens';
 import { formatTimeRange } from '../logic/dates';
 import { useStyles, useTheme } from '../state/Theme';
 import { motion } from '../design/feedback';
 
 const SOURCE_ICON = { calendar: 'calendar-outline', panmatz: 'barbell-outline' };
 
-// משימה חשובה (שעוד לא בוצעה) — לפי הסגנון שנבחר בהגדרות:
-//  glow  — מסגרת וזוהר בצבע המשימה + כוכב
-//  badge — כרטיס רגיל עם תווית "חשוב"
-//  bold  — כרטיס מלא בצבע המשימה
+// משימה חשובה (שעוד לא בוצעה) — בצבע החשיבות (אדום כברירת מחדל), באחד משלושה סגנונות:
+//  outline — רקע עדין בצבע + מסגרת דקה + תווית מלאה
+//  soft    — כרטיס רגיל, פס צד ותווית רכה בצבע
+//  solid   — כרטיס מלא בצבע
 export const IMPORTANT_STYLES = [
-  { id: 'glow', name: 'זוהר' },
-  { id: 'badge', name: 'תווית' },
-  { id: 'bold', name: 'מלא' },
+  { id: 'outline', name: 'מסגרת' },
+  { id: 'soft', name: 'עדין' },
+  { id: 'solid', name: 'מלא' },
 ];
+const LEGACY = { glow: 'outline', badge: 'soft', bold: 'solid' };
 
-export default function TaskCard({ item, index = 0, onToggle, onPress, onLongPress, importantStyle }) {
+export default function TaskCard({ item, index = 0, onToggle, onPress, onLongPress, importantStyle, importantColor }) {
   const styles = useStyles(makeStyles);
   const theme = useTheme();
   const missed = item.missed;
-  const imp = item.important && !item.done ? importantStyle || theme.importantStyle || 'glow' : null;
-  const filled = imp === 'bold';
-  const ink = filled ? onColor(item.color) : null;
+  const rawStyle = importantStyle || theme.importantStyle || 'outline';
+  const imp = item.important && !item.done ? LEGACY[rawStyle] || rawStyle : null;
+  const c = importantColor || theme.importantColor || IMPORTANT_RED;
+  const solid = imp === 'solid';
+  const ink = solid ? onColor(c) : null;
+  const accent = imp ? c : item.color; // בחשובה — פס הצד והעיגול בצבע החשיבות
   const meta = [formatTimeRange(item.startTime, item.endTime), item.categoryName].filter(Boolean).join(' · ');
+  const hasAlarm = imp && (item.task?.alarms || '').length > 2;
   return (
     <Animated.View entering={motion(FadeInDown.delay(Math.min(index, 8) * 35).duration(260))} layout={motion(LinearTransition.springify().damping(18))}>
       <Pressable
@@ -38,33 +43,43 @@ export default function TaskCard({ item, index = 0, onToggle, onPress, onLongPre
         style={({ pressed }) => [
           styles.card,
           missed && styles.cardMissed,
-          imp === 'glow' && [styles.glow, { borderColor: item.color, backgroundColor: tint(item.color, 0.07), shadowColor: item.color }],
-          filled && [styles.filled, { backgroundColor: item.color, shadowColor: item.color }],
+          imp === 'outline' && { backgroundColor: mix(colors.card, c, colors.mode === 'dark' ? 0.14 : 0.06), borderWidth: 1.5, borderColor: c },
+          solid && { backgroundColor: c },
           pressed && onPress && styles.pressed,
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`${item.title}, ${meta}${item.done ? ', הושלם' : missed ? ', פספוס' : ''}`}
+        accessibilityLabel={`${imp ? 'חשוב: ' : ''}${item.title}, ${meta}${item.done ? ', הושלם' : missed ? ', פספוס' : ''}`}
       >
-        {filled ? null : <View style={[styles.strip, { backgroundColor: item.color }]} />}
+        {solid ? null : <View style={[styles.strip, { backgroundColor: accent }]} />}
         <View style={styles.body}>
-          {imp === 'badge' ? (
-            <View style={styles.badge}>
-              <Ionicons name="star" size={12} color={STAR} />
-              <Text style={styles.badgeText}>חשוב</Text>
+          {imp ? (
+            <View
+              style={[
+                styles.pill,
+                imp === 'outline' && { backgroundColor: c },
+                imp === 'soft' && { backgroundColor: mix(colors.card, c, colors.mode === 'dark' ? 0.24 : 0.14) },
+                solid && { backgroundColor: mix(c, ink, 0.22) },
+              ]}
+            >
+              <Ionicons name="star" size={11} color={imp === 'soft' ? c : imp === 'outline' ? onColor(c) : ink} />
+              <Text
+                style={[
+                  styles.pillText,
+                  { color: imp === 'soft' ? (colors.mode === 'dark' ? c : mix(c, '#000000', 0.2)) : imp === 'outline' ? onColor(c) : ink },
+                ]}
+              >
+                חשוב
+              </Text>
             </View>
           ) : null}
-          <View style={styles.titleRow}>
-            {imp === 'glow' || filled ? <Ionicons name="star" size={16} color={filled ? ink : STAR} style={styles.star} /> : null}
-            <Text style={[styles.title, item.done && styles.titleDone, filled && { color: ink }]} numberOfLines={2}>
-              {item.title}
-            </Text>
-          </View>
+          <Text style={[styles.title, item.done && styles.titleDone, solid && { color: ink }]} numberOfLines={2}>
+            {item.title}
+          </Text>
           <View style={styles.metaRow}>
-            {SOURCE_ICON[item.source] ? (
-              <Ionicons name={SOURCE_ICON[item.source]} size={13} color={filled ? ink : colors.ink3} style={styles.metaIcon} />
-            ) : null}
-            {item.recurring ? <Ionicons name="repeat" size={13} color={filled ? ink : colors.ink3} style={styles.metaIcon} /> : null}
-            <Text style={[styles.meta, filled && { color: ink, opacity: 0.85 }]} numberOfLines={1}>
+            {hasAlarm ? <Ionicons name="alarm-outline" size={13} color={solid ? ink : c} style={styles.metaIcon} /> : null}
+            {SOURCE_ICON[item.source] ? <Ionicons name={SOURCE_ICON[item.source]} size={13} color={solid ? ink : colors.ink3} style={styles.metaIcon} /> : null}
+            {item.recurring ? <Ionicons name="repeat" size={13} color={solid ? ink : colors.ink3} style={styles.metaIcon} /> : null}
+            <Text style={[styles.meta, solid && { color: ink, opacity: 0.85 }]} numberOfLines={1}>
               {meta}
             </Text>
           </View>
@@ -86,14 +101,7 @@ export default function TaskCard({ item, index = 0, onToggle, onPress, onLongPre
           ) : null}
         </View>
         <View style={[styles.checkWrap, { backgroundColor: item.done ? tint(item.color, 0.1) : 'transparent' }]}>
-          <CheckCircle
-            done={item.done}
-            missed={missed}
-            color={filled ? ink : item.color}
-            onToggle={onToggle}
-            size={layout.check}
-            label={`סימון ${item.title}`}
-          />
+          <CheckCircle done={item.done} missed={missed} color={solid ? ink : accent} onToggle={onToggle} size={layout.check} label={`סימון ${item.title}`} />
         </View>
       </Pressable>
     </Animated.View>
@@ -115,22 +123,17 @@ const makeStyles = () =>
       ...shadow.card,
     },
     cardMissed: { backgroundColor: colors.missedSoft },
-    glow: { borderWidth: 2, shadowOpacity: 0.35, shadowRadius: 14, elevation: 8 },
-    filled: { shadowOpacity: 0.4, shadowRadius: 16, elevation: 10 },
-    titleRow: { flexDirection: 'row', alignItems: 'center' },
-    star: { marginEnd: 6 },
-    badge: {
+    pill: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
       alignSelf: 'flex-start',
-      backgroundColor: tint(STAR, 0.16),
+      height: 20,
       borderRadius: radius.pill,
       paddingHorizontal: 8,
-      paddingVertical: 2,
-      marginBottom: 2,
+      marginBottom: 4,
     },
-    badgeText: { fontFamily: font.bold, fontSize: fs(12), color: '#B87400' },
+    pillText: { fontFamily: font.bold, fontSize: fs(11), lineHeight: fs(14) },
     pressed: { transform: [{ scale: 0.985 }] },
     strip: { width: 5, alignSelf: 'stretch', borderRadius: 3, marginEnd: space[3] },
     body: { flex: 1, minWidth: 0, gap: 2 },

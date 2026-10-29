@@ -16,8 +16,8 @@ import { ALARM_OPTIONS, DEFAULT_ALARMS, parseAlarms } from '../services/alarms';
 import { parseRule, validateRule } from '../logic/recurrence';
 import { newId } from '../logic/editing';
 import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey, formatTimeRange, timeModeOf, timesFor, END_OF_DAY } from '../logic/dates';
-import { PALETTE, STAR, colors, space, text, font, shadow, tint } from '../design/tokens';
-import { useStyles } from '../state/Theme';
+import { PALETTE, IMPORTANT_RED, colors, space, text, font, shadow, tint } from '../design/tokens';
+import { useStyles, useTheme } from '../state/Theme';
 import { haptic, motion } from '../design/feedback';
 
 const REPEAT = [
@@ -129,6 +129,7 @@ const NEW_CATEGORY = '__new';
 
 function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
   const styles = useStyles(makeStyles);
+  const impColor = useTheme().importantColor || IMPORTANT_RED;
   const { task, date } = sheet;
   const [d, setD] = useState(() => initialDraft(task, date, settings, categories));
   const [error, setError] = useState(null);
@@ -305,11 +306,11 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
           haptic.light();
           set({ important: !d.important });
         }}
-        style={[styles.importantRow, d.important && styles.importantRowOn]}
+        style={[styles.importantRow, d.important && { backgroundColor: tint(impColor, 0.1), borderColor: impColor }]}
         accessibilityRole="switch"
         accessibilityState={{ checked: d.important }}
       >
-        <Ionicons name={d.important ? 'star' : 'star-outline'} size={22} color={d.important ? STAR : colors.ink3} />
+        <Ionicons name={d.important ? 'star' : 'star-outline'} size={22} color={d.important ? impColor : colors.ink3} />
         <View style={styles.importantTexts}>
           <Text style={styles.importantTitle}>משימה חשובה</Text>
           <Text style={styles.importantSub}>{d.important ? 'תופיע למעלה, מודגשת, ותצלצל כמו שעון מעורר' : 'להבליט ולקבל צלצול לפני'}</Text>
@@ -477,7 +478,6 @@ const makeStyles = () =>
       borderWidth: 1.5,
       borderColor: 'transparent',
     },
-    importantRowOn: { backgroundColor: tint(STAR, 0.12), borderColor: STAR },
     importantTexts: { flex: 1 },
     importantTitle: { fontFamily: font.bold, fontSize: 16, color: colors.ink, textAlign: 'left' },
     importantSub: { ...text.caption, color: colors.ink2, textAlign: 'left' },
