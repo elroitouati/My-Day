@@ -15,7 +15,7 @@ import { REMINDER_OPTIONS } from '../services/notifications';
 import { ALARM_OPTIONS, DEFAULT_ALARMS, parseAlarms } from '../services/alarms';
 import { parseRule, validateRule } from '../logic/recurrence';
 import { newId } from '../logic/editing';
-import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey, formatTimeRange } from '../logic/dates';
+import { formatHebDate, weekday, keyToDate, timeToMinutes, minutesToTime, todayKey, formatTimeRange, timeModeOf, timesFor, END_OF_DAY } from '../logic/dates';
 import { PALETTE, STAR, colors, space, text, font, shadow, tint } from '../design/tokens';
 import { useStyles } from '../state/Theme';
 import { haptic, motion } from '../design/feedback';
@@ -36,7 +36,7 @@ function initialDraft(task, date, settings, categories) {
       category_id: null, // קטגוריה לא חובה
       color: null, // צבע משלה (null = לפי הקטגוריה)
       notes: '',
-      timed: false,
+      timeMode: 'allday',
       start_time: '09:00',
       end_time: '10:00',
       reminder: settings?.defaultReminder ?? 10,
@@ -58,9 +58,9 @@ function initialDraft(task, date, settings, categories) {
     category_id: task.category_id,
     color: task.color || null,
     notes: task.notes || '',
-    timed: !!task.start_time,
+    timeMode: timeModeOf(task.start_time, task.end_time),
     start_time: task.start_time || '09:00',
-    end_time: task.end_time || '',
+    end_time: task.end_time && task.end_time !== END_OF_DAY ? task.end_time : '',
     reminder: task.reminder ?? null,
     important: !!task.important,
     alarms: task.important ? parseAlarms(task.alarms) : DEFAULT_ALARMS,
@@ -89,11 +89,10 @@ function toTask(d) {
     category_id: d.category_id,
     color: d.color || null,
     notes: d.notes.trim() || null,
-    start_time: d.timed ? d.start_time : null,
-    end_time: d.timed && d.end_time ? d.end_time : null,
-    reminder: d.timed ? d.reminder : null,
+    ...timesFor(d.timeMode, d.start_time, d.end_time),
+    reminder: d.timeMode !== 'allday' ? d.reminder : null,
     important: !!d.important,
-    alarms: d.important && d.timed ? d.alarms : null,
+    alarms: d.important && d.timeMode !== 'allday' ? d.alarms : null,
     kind: once ? 'once' : 'recurring',
     date: once ? d.date : null,
     rule,
@@ -158,10 +157,10 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
       title: h.title,
       category_id: catExists ? h.category_id : null,
       color: h.color || null,
-      timed: !!h.start_time,
+      timeMode: timeModeOf(h.start_time, h.end_time),
       start_time: h.start_time || d.start_time,
-      end_time: h.end_time || '',
-      reminder: h.start_time ? (h.reminder ?? null) : d.reminder,
+      end_time: h.end_time && h.end_time !== END_OF_DAY ? h.end_time : '',
+      reminder: h.start_time || h.end_time ? (h.reminder ?? null) : d.reminder,
     });
     setSuggestOpen(false);
   }; // { name, color } כשיוצרים קטגוריה מתוך הגיליון
@@ -188,6 +187,10 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
     setNewCat(null);
   };
 
+  const chooseTimeMode = (m) => {
+    // "עד" בלי שעה שנבחרה — ברירת מחדל 18:00
+    set(m === 'until' && !d.end_time ? { timeMode: m, end_time: '18:00' } : { timeMode: m });
+  };
   const setStart = (t) => {
     const s = timeToMinutes(t);
     const e = timeToMinutes(d.end_time);
@@ -287,7 +290,7 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
                     ))}
                   </Text>
                   <Text style={styles.suggestMeta} numberOfLines={1}>
-                    {[h.start_time ? formatTimeRange(h.start_time, h.end_time) : 'כל היום', cat?.name].filter(Boolean).join(' · ')}
+                    {[formatTimeRange(h.start_time, h.end_time), cat?.name].filter(Boolean).join(' · ')}
                   </Text>
                 </View>
                 <Ionicons name="arrow-undo-outline" size={18} color={colors.ink3} />
@@ -386,19 +389,33 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
               trailing={<Toggle value={d.hasEnd} onValueChange={(v) => set({ hasEnd: v, end_date: v ? d.end_date || d.start_date : null })} />}
             />
           ) : null}
-          <Row
-            icon="time-outline"
-            title="שעה"
-            subtitle={d.timed ? null : 'כל היום'}
-            trailing={<Toggle value={d.timed} onValueChange={(v) => set({ timed: v })} />}
-          />
-          {d.timed ? <Row title="התחלה" value={d.start_time} onPress={() => pickTime(d.start_time, setStart)} /> : null}
-          {d.timed ? <Row title="סיום" value={d.end_time || 'ללא'} onPress={() => pickTime(d.end_time || d.start_time, (t) => set({ end_time: t }))} /> : null}
+          <View style={styles.timeModes}>
+            <View style={styles.timeHead}>
+              <Ionicons name="time-outline" size={18} color={colors.brand} />
+              <Text style={styles.timeTitle}>שעה</Text>
+            </View>
+            <Chips options={TIME_MODES} value={d.timeMode} onChange={chooseTimeMode} />
+          </View>
+          {d.timeMode === 'range' ? <Row title="התחלה" value={d.start_time} onPress={() => pickTime(d.start_time, setStart)} /> : null}
+          {d.timeMode === 'range' ? (
+            <Row title="סיום" value={d.end_time || 'ללא'} onPress={() => pickTime(d.end_time || d.start_time, (t) => set({ end_time: t }))} />
+          ) : null}
+          {d.timeMode === 'from' ? (
+            <Row title="החל מהשעה" subtitle="ועד סוף היום" value={d.start_time} onPress={() => pickTime(d.start_time, (t) => set({ start_time: t }))} />
+          ) : null}
+          {d.timeMode === 'until' ? (
+            <Row
+              title="עד השעה"
+              subtitle="אפשר לעשות מתי שרוצים עד אז"
+              value={d.end_time || '18:00'}
+              onPress={() => pickTime(d.end_time || '18:00', (t) => set({ end_time: t }))}
+            />
+          ) : null}
         </Group>
 
-        {d.timed ? (
+        {d.timeMode !== 'allday' ? (
           <>
-            <Label>תזכורת לפני</Label>
+            <Label>{d.timeMode === 'until' ? 'תזכורת לפני השעה' : 'תזכורת לפני'}</Label>
             <Chips options={REMINDER_OPTIONS} value={d.reminder} onChange={(v) => set({ reminder: v })} />
           </>
         ) : null}
@@ -406,7 +423,7 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
         {d.important ? (
           <Animated.View entering={motion(FadeIn)}>
             <Label>⏰ צלצול (כמו שעון מעורר)</Label>
-            {d.timed ? (
+            {d.timeMode !== 'allday' ? (
               <MultiChips options={ALARM_OPTIONS} values={d.alarms} onChange={(v) => set({ alarms: v })} />
             ) : (
               <Text style={styles.importantHint}>כדי שיצלצל — צריך לקבוע שעה למשימה</Text>
@@ -436,8 +453,18 @@ function TaskForm({ sheet, categories, settings, reloadMeta, onDone }) {
   );
 }
 
+const TIME_MODES = [
+  { value: 'allday', label: 'כל היום' },
+  { value: 'range', label: 'בשעה' },
+  { value: 'from', label: 'החל מ…' },
+  { value: 'until', label: 'עד…' },
+];
+
 const makeStyles = () =>
   StyleSheet.create({
+    timeModes: { paddingHorizontal: space[3], paddingVertical: space[3], gap: space[2] },
+    timeHead: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+    timeTitle: { fontFamily: font.bold, fontSize: 16, color: colors.ink, textAlign: 'left' },
     importantRow: {
       flexDirection: 'row',
       alignItems: 'center',

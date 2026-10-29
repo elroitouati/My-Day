@@ -95,7 +95,7 @@ export function buildRangeItems(startKey, endKey, data, today) {
   return byDate;
 }
 
-// "כל היום" קודם, אחר כך לפי שעת התחלה, ואז לפי כותרת
+// "כל היום" קודם (ואחריו "עד X" לפי המועד), אחר כך לפי שעת התחלה, ואז לפי כותרת
 export function sortItems(items) {
   return [...items].sort((a, b) => {
     const ta = timeToMinutes(a.startTime);
@@ -103,6 +103,12 @@ export function sortItems(items) {
     if (ta == null && tb != null) return -1;
     if (ta != null && tb == null) return 1;
     if (ta != null && tb != null && ta !== tb) return ta - tb;
+    if (ta == null && tb == null) {
+      // בלי שעת התחלה: "כל היום" לפני "עד X", ומשימות "עד" לפי המועד האחרון
+      const ea = timeToMinutes(a.endTime) ?? -1;
+      const eb = timeToMinutes(b.endTime) ?? -1;
+      if (ea !== eb) return ea - eb;
+    }
     const order = { task: 0, panmatz: 1, calendar: 2 };
     if (order[a.source] !== order[b.source]) return order[a.source] - order[b.source];
     return a.title.localeCompare(b.title, 'he');

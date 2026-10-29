@@ -1,9 +1,6 @@
 // עזרי תאריכים טהורים — הכל לפי השעון המקומי, מפתח יום בפורמט YYYY-MM-DD.
 
-export const HEB_MONTHS = [
-  'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
-  'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר',
-];
+export const HEB_MONTHS = ['ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני', 'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'];
 export const HEB_WEEKDAYS_SHORT = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳'];
 export const HEB_WEEKDAYS_LETTER = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
 export const HEB_WEEKDAYS_FULL = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
@@ -91,10 +88,30 @@ export function keyTimeToDate(key, time) {
   return d;
 }
 
+// "מ-X" נשמר כסיום ב-23:59 (עד סוף היום); "עד X" נשמר בלי שעת התחלה
+export const END_OF_DAY = '23:59';
+
 export function formatTimeRange(start, end) {
-  if (!start) return 'כל היום';
+  if (!start) return end ? `עד ${end}` : 'כל היום';
+  if (end === END_OF_DAY) return `מ-${start}`;
   return end ? `${start}–${end}` : start;
 }
+
+// מצב השעה של משימה: allday | range (שעה / טווח) | from (משעה X והלאה) | until (עד שעה X)
+export function timeModeOf(start, end) {
+  if (!start) return end ? 'until' : 'allday';
+  return end === END_OF_DAY ? 'from' : 'range';
+}
+
+export function timesFor(mode, start, end) {
+  if (mode === 'until') return { start_time: null, end_time: end || null };
+  if (mode === 'from') return { start_time: start, end_time: END_OF_DAY };
+  if (mode === 'range') return { start_time: start, end_time: end && end !== END_OF_DAY ? end : null };
+  return { start_time: null, end_time: null };
+}
+
+// השעה שלפיה מזכירים / מצלצלים: ההתחלה, ואם אין — המועד האחרון ("עד")
+export const anchorTime = (item) => item.startTime || item.endTime || null;
 
 // לוח חודשי: מערך שבועות, כל אחד 7 תאים (null לתא ריק). השבוע מתחיל בראשון.
 export function buildMonthGrid(year, monthIndex) {

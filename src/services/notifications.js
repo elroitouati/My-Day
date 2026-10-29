@@ -2,7 +2,7 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { getSettings, loadRange } from '../db/repo';
-import { addDays, keyTimeToDate, rangeKeys, todayKey, formatTimeRange } from '../logic/dates';
+import { addDays, keyTimeToDate, rangeKeys, todayKey, formatTimeRange, anchorTime } from '../logic/dates';
 import { coalesce } from './events';
 import { inQuietHours } from '../logic/arrange';
 import { colors } from '../design/tokens';
@@ -83,6 +83,7 @@ export async function requestNotificationPermission() {
 
 function reminderBody(item, minutes) {
   const range = formatTimeRange(item.startTime, item.endTime);
+  if (!item.startTime) return minutes === 0 ? `הגיע הזמן · ${range}` : `נשארו ${minutes === 60 ? 'שעה' : `${minutes} דקות`} · ${range}`;
   if (minutes === 0) return `מתחיל עכשיו · ${range}`;
   if (minutes === 60) return `בעוד שעה · ${range}`;
   return `בעוד ${minutes} דקות · ${range}`;
@@ -101,8 +102,8 @@ export function importantAlarmTimes(byDate, dates, now, { shabbat = false } = {}
   const out = [];
   for (const date of dates) {
     for (const item of byDate[date] || []) {
-      if (item.source !== 'task' || !item.important || !item.startTime || item.done) continue;
-      const start = keyTimeToDate(date, item.startTime).getTime();
+      if (item.source !== 'task' || !item.important || !anchorTime(item) || item.done) continue;
+      const start = keyTimeToDate(date, anchorTime(item)).getTime();
       for (const minutes of parseAlarms(item.task?.alarms)) {
         const at = start - minutes * 60000;
         if (at <= now || inQuietHours(new Date(at), { shabbat })) continue;
@@ -115,6 +116,7 @@ export function importantAlarmTimes(byDate, dates, now, { shabbat = false } = {}
 
 function alarmBody(item, minutes) {
   const range = formatTimeRange(item.startTime, item.endTime);
+  if (!item.startTime) return minutes === 0 ? `הגיע הזמן · ${range}` : `נשארו ${minutes === 60 ? 'שעה' : `${minutes} דקות`} · ${range}`;
   return minutes === 0 ? `עכשיו · ${range}` : `בעוד ${minutes === 60 ? 'שעה' : `${minutes} דקות`} · ${range}`;
 }
 
@@ -162,10 +164,10 @@ async function rescheduleNow() {
     const items = byDate[date] || [];
     for (const item of items) {
       if (taskCount >= MAX_TASK_NOTIFICATIONS) break;
-      if (item.source !== 'task' || !item.startTime || item.done) continue;
+      if (item.source !== 'task' || !anchorTime(item) || item.done) continue;
       const minutes = item.task.reminder;
       if (minutes == null) continue;
-      const at = keyTimeToDate(date, item.startTime).getTime() - minutes * 60000;
+      const at = keyTimeToDate(date, anchorTime(item)).getTime() - minutes * 60000;
       if (!allowed(at)) continue;
       taskCount += 1;
       await Notifications.scheduleNotificationAsync({
