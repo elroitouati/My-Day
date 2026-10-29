@@ -244,7 +244,7 @@ function AppearanceSection() {
   const styles = useStyles(makeStyles);
   const { mode, accent, tabStyle, font: fontId, textSize, density, setTheme } = useTheme();
   const isCustom = accent.startsWith('#');
-  const [customOpen, setCustomOpen] = useState(isCustom);
+  const [customOpen, setCustomOpen] = useState(false); // הבוחר המלא נפתח רק בלחיצה
   const [custom, setCustom] = useState(isCustom ? accent : '#6C5CFF');
   const debounce = useRef(null);
   // בגרירה בבוחר הצבעים מעדכנים את האפליקציה אחרי עצירה קצרה, לא בכל תזוזה
@@ -305,6 +305,7 @@ function AppearanceSection() {
           })}
           <Pressable
             onPress={() => {
+              if (isCustom) return setCustomOpen((o) => !o);
               setCustomOpen(true);
               change({ accent: custom });
             }}
@@ -328,7 +329,7 @@ function AppearanceSection() {
             <Text style={[styles.accentName, isCustom && styles.accentNameOn]}>צבע משלי</Text>
           </Pressable>
         </View>
-        {customOpen && isCustom ? <ColorPicker value={custom} onChange={pickCustom} allowNone={false} /> : null}
+        {customOpen && isCustom ? <ColorPicker value={custom} onChange={pickCustom} allowNone={false} startOpen /> : null}
 
         <Text style={styles.subLabel}>סרגל הכפתורים למטה</Text>
         <Chips options={TAB_STYLES.map((t) => ({ value: t.id, label: t.name }))} value={tabStyle} onChange={(v) => change({ tabStyle: v })} />

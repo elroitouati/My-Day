@@ -1,4 +1,5 @@
 // עדכונים "באוויר" (expo-updates): בדיקה, הורדה והפעלה, עם מצב משותף לכל המסכים.
+import { Alert } from 'react-native';
 import * as Updates from 'expo-updates';
 import * as Notifications from 'expo-notifications';
 import { getSettings, setSetting } from '../db/repo';
@@ -36,7 +37,14 @@ export async function checkForUpdate() {
   }
 }
 
-export const applyUpdate = () => Updates.reloadAsync();
+// מפעיל מחדש עם העדכון. אם ההפעלה נכשלת — מסבירים מה לעשות במקום להיכשל בשקט.
+export async function applyUpdate() {
+  try {
+    await Updates.reloadAsync();
+  } catch (e) {
+    Alert.alert('העדכון לא הופעל', `סגור את האפליקציה לגמרי ופתח שוב — העדכון ייכנס.\n\n(${e?.message || e})`);
+  }
+}
 
 // מתי נבנתה הגרסה שרצה עכשיו (עדכון אחרון או ה-APK עצמו)
 export function currentBuildDate() {
