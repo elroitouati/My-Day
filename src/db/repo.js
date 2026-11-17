@@ -273,6 +273,13 @@ export async function upsertPanmatzRow(r) {
   );
 }
 
+// היום האחרון שיש עליו נתונים מפנמ"צ (כדי לזהות שפנמ"צ הפסיקה לשלוח)
+export async function getLatestPanmatzDate() {
+  const db = await getDb();
+  const row = await db.getFirstAsync('SELECT MAX(date) AS d FROM panmatz_items WHERE deleted = 0 OR deleted IS NULL');
+  return row?.d || null;
+}
+
 export async function clearPanmatz() {
   const db = await getDb();
   await db.execAsync('DELETE FROM panmatz_items; DELETE FROM sync_queue;');

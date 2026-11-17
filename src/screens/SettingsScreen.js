@@ -17,7 +17,8 @@ import { notificationPermission, requestNotificationPermission, REMINDER_OPTIONS
 import { hasCalendarPermission, requestCalendarPermission, listCalendars, refreshCalendarCache, disableCalendar } from '../services/calendar';
 import { supabaseConfigured, signIn, signUp, signOut, authErrorText } from '../services/supabase';
 import { syncPanmatz, getLastSyncError } from '../services/panmatzSync';
-import { clearPanmatz } from '../db/repo';
+import { clearPanmatz, getLatestPanmatzDate } from '../db/repo';
+import { todayKey, formatHebDate } from '../logic/dates';
 import { PANMATZ_CATEGORY, UNCATEGORIZED } from '../logic/dayItems';
 import { colors, space, text, font, ACCENTS, TAB_STYLES, FONTS, TEXT_SIZES, DENSITIES, fs } from '../design/tokens';
 import { useStyles, useTheme } from '../state/Theme';
@@ -477,6 +478,15 @@ function PanmatzAccount() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [latest, setLatest] = useState(undefined);
+  const { version } = useAppState();
+  useEffect(() => {
+    getLatestPanmatzDate()
+      .then(setLatest)
+      .catch(() => setLatest(null));
+  }, [version]);
+  // פנמ"צ שולחת את האימונים קדימה; אם אין כלום להיום — כנראה שהיא לא מסנכרנת
+  const stale = user && latest !== undefined && (!latest || latest < todayKey());
 
   if (!supabaseConfigured) {
     return (
@@ -506,6 +516,18 @@ function PanmatzAccount() {
         footer={msg?.text || (err ? `הסנכרון האחרון נכשל: ${authErrorText(err)}` : 'אימונים ומטרות מפנמ"צ מופיעים כאן, וסימון בכל צד מתעדכן בשני.')}
       >
         <Row icon="cloud-done-outline" iconColor={PANMATZ_CATEGORY.color} title="מחובר" subtitle={user.email} />
+        {stale ? (
+          <Row
+            icon="warning-outline"
+            danger
+            title="לא מגיעים אימונים מפנמ״צ"
+            subtitle={
+              latest
+                ? `האימונים האחרונים שהתקבלו: ${formatHebDate(latest)}. ודא שגרסת פנמ״צ כוללת את הסנכרון, ופתח אותה.`
+                : 'עוד לא התקבלו אימונים. ודא שגרסת פנמ״צ כוללת את הסנכרון, ופתח אותה.'
+            }
+          />
+        ) : null}
         <Row
           icon="sync-outline"
           title="סנכרון עכשיו"
